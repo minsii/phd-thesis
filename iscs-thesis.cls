@@ -492,6 +492,8 @@
     \vskip 20\p@
     {Thesis Supervisor: \@esupervisor \quad \@jsupervisor\\
      \@supervisortitleline}\par
+    {Co-Advisor: \@ecoadvisor\\
+     \@coadvisortitleline}\par
   \vskip-\footskip
   \vskip-100\p@\@plus1fill\null
   \end{ist@titlepage}%
@@ -568,6 +570,7 @@
   \global\let\@etitle\@empty
   \global\let\@jsupervisor\@empty
   \global\let\@esupervisor\@empty
+  \global\let\@ecoadvisor\@empty
   \global\let\@supervisortitle\@empty
   \global\let\@submittedto\@empty
   \global\let\@degree\@empty
@@ -583,6 +586,7 @@
   \global\let\eauthor\relax
   \global\let\jsupervisor\relax
   \global\let\esupervisor\relax
+  \global\let\ecoadvisor\relax
   \global\let\supervisortitle\relax
   \global\let\date\relax
   %
@@ -637,6 +641,8 @@
     \vskip 20\p@
     {Thesis Supervisor: \@esupervisor\\
      \@supervisortitleline}\par
+    {Co-Advisor: \@ecoadvisor\\
+     \@coadvisortitleline}\par
   \vskip-\footskip
   \vskip-100\p@\@plus1fill\null
   \end{ist@titlepage}%
@@ -1274,6 +1280,7 @@
 \def\eauthor#1{\gdef\@eauthor{#1}}
 \def\jauthor#1{\gdef\@jauthor{#1}}
 \def\esupervisor#1{\gdef\@esupervisor{#1}}
+\def\ecoadvisor#1{\gdef\@ecoadvisor{#1}}
 \def\jsupervisor#1{\gdef\@jsupervisor{#1}}
 \def\supervisortitle#1{\gdef\@supervisortitle{#1}}
 \def\@etitle{\ist@err@notdefd\etitle}
@@ -1281,6 +1288,7 @@
 \def\@eauthor{\ist@err@notdefd\eauthor}
 \def\@jauthor{\ist@err@notdefd\jauthor}
 \def\@esupervisor{\ist@err@notdefd\esupervisor}
+\def\@ecoadvisor{\ist@err@notdefd\ecoadvisor}
 \def\@jsupervisor{\ist@err@notdefd\jsupervisor}
 \def\@supervisortitle{\ist@err@notdefd\supervisortitle}
 \def\@date{\ist@err@notdefd\@date}
@@ -1293,6 +1301,11 @@
 \newcommand\@supervisortitleline{%
   \@supervisortitle\ of \ist@whatscience
 }
+\newcommand*\coadvisortitleline[1]{\gdef\@coadvisortitleline{#1}}
+\newcommand\@coadvisortitleline{%
+  \@supervisortitle
+}
+
 \ifist@english \catcode`\.=14 \else \catcode`\.=9 \fi
 .\newcommand\ist@j@senior{卒業論文}
 .\newcommand\ist@j@master{修士論文}
