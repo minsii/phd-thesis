@@ -1,0 +1,66 @@
+Since multicore processor chips are the norm today, the only way to 
+improve the performance for high end processors is to add more threads 
+and cores. Many core architecture, such as Intel Xeon Phi and Blue Gene/Q, 
+provides us such a massively parallel environment with dozens of cores and
+hundreds of hardware threads. To efficiently utilize such architectures, 
+application programmers are increasingly looking at hybrid programming 
+models comprising a mixture of processes and threads (frequently called 
+``MPI+X'' models). A common mode of operation for such applications 
+uses multiple threads to parallelize the computation, while one of the 
+threads also issues MPI operations (i.e., MPI \texttt{FUNNELED} or 
+\texttt{SERIALIZED} thread-safety mode). Although such model extremely 
+improves floating point performance for most applications, still 
+some of them lose performance at the bottleneck of MPI communication.
+This thesis focuses on exploiting the capabilities of many core 
+architectures on widely used MPI implementation, in order to eliminate
+the communication bottleneck and consequently achieve highly efficient 
+performance for user applications.
+
+% parallelism
+Most applications implement hybrid MPI+threads model by 
+utilizing OpenMP, the most prominent of the threading models used 
+in scientific computing today, to parallelize their computation.
+In MPI+OpenMP applications, the common \texttt{FUNNELED}\slash \texttt{SERIALIZED} 
+mode is achieved, for example, by placing MPI calls in OpenMP critical 
+sections or outside the OpenMP parallel regions. However, such a model 
+often means that the OpenMP threads are active only during the parallel 
+computation phase and idle during the MPI calls, resulting in wasted 
+computational resources. Moreover, the sequential communication phase, 
+which is executed by single light-weight core, may even degrade 
+performance. 
+In this thesis, we first focus on MPI internal parallelism. We present MT-MPI, an
+internally multithreaded MPI implementation that transparently
+coordinates with the threading runtime system to share idle threads
+with the application. It is designed in the context of OpenMP and
+requires modifications to both the MPI implementation and the OpenMP
+runtime in order to share appropriate information between them. We
+demonstrate the benefit of such internal parallelism for various
+aspects of MPI processing, including derived datatype communication,
+shared-memory communication, and network I/O operations.
+
+% asynchronous progress
+Another way to minimize the communication bottleneck is achieving 
+better overlap with computation. The MPI-2 standard introduced 
+one-sided communication semantics (also known as RMA) 
+that allow one process to specify all communication parameters, for 
+both the sending side and the receiving side. Thus, a process can 
+access memory regions of other processes in the system without the target 
+process explicitly needing to receive or process the message.
+RMA has the potential to deliver better communication and computation 
+overlap than traditional two-sided communication does, particularly on networks 
+that support one-sided communication natively, such as InfiniBand or 
+Cray Aries interconnects. However, the MPI standard does not guarantee that 
+such communication is truly asynchronous. Thus, most MPI implementations 
+require the remote target to make MPI calls to ensure progress 
+on such operations. Manticore, a process-based asynchronous progress
+model for MPI on many-core architectures, is the second sub-topic 
+in this thesis. Manticore uses a combination of MPI-3 shared-memory
+windows and PMPI-based redirection of RMA operations to assist RMA
+operations that require software intervention for progress without
+affecting hardware-based RMA operations.  We describe the design of Manticore 
+and compare it with other approaches for asynchronous progress.
+Preliminary evaluation results show that Manticore offers improved 
+performance and good scalability.
+
+\clearpage
+
