@@ -20,17 +20,13 @@ pic_files = $(shell find $(PICS) \
 		-or \( -name '*.fig' -print \) -or \( -name '*.pdf' -print \) \
 	)
 
-$(HEADER).pdf: $(HEADER).tex $(tex_files) $(bib_files) $(pic_files)
-	@if test "`which rubber`" != "" ; then \
-		TEXMFOUTPUT=`pwd` rubber -d -f $(HEADER) ; \
-	else \
-		pdflatex $(HEADER) | tee latex.out ; \
-		bibtex $(HEADER); \
-		touch .rebuild; \
-		pdflatex $(HEADER) | tee latex.out; \
-		pdflatex $(HEADER) | tee latex.out; \
-		rm -f latex.out ; \
-	fi
+thesis.pdf: thesis.dvi
+	dvipdfmx thesis
+thesis.dvi: $(HEADER).tex $(tex_files) $(bib_files) $(pic_files)
+	platex thesis
+	# bibtex thesis
+	platex thesis
+	platex thesis
 
 clean:
 	@if test "`which rubber`" != "" ; then \
