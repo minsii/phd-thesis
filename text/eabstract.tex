@@ -91,7 +91,9 @@ a \textit{process-based asynchronous progress model for MPI on many-core
 architectures utilizing dedicated helper cores}. It uses a combination 
 of MPI-3 shared-memory windows and PMPI-based redirection of RMA operations 
 to assist RMA operations that require software intervention for progress 
-without affecting hardware-based RMA operations. Preliminary evaluation 
+without affecting hardware-based RMA operations. Moreover, PMPI-based 
+redirection helps us separate from any MPI implementation so that various 
+MPI implementations are able to be easily supported. Preliminary evaluation
 proofs its highly efficient overlap capability and good scalability.
 
 Although shared-memory window technology enables the cooperation with 
