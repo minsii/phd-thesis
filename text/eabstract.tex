@@ -31,7 +31,7 @@ models over distributed-memory systems. MPI is the most widely used standard for
 writing such communication model. An MPI progress can be synchronous or asynchronous. 
 In traditional two-sided send\slash receive communication mode, a synchronous MPI progress, such as 
 blocking send, can be finished only after the message has been received by receiver;
-non-blocking operations is the example for asynchronous progress, in which a send 
+non-blocking operations are asynchronous progress, in which a send 
 operation can be finished immediately without waiting for message reception. 
 Moreover, the MPI-2 standard introduced one-sided communication semantics (also known as RMA), 
 that allows one process to specify all communication parameters, for both the 
@@ -39,7 +39,7 @@ sending side and the receiving side. Thus, a process can access memory regions
 of other processes in the system without the target process explicitly needing 
 to receive or process the message. RMA has the potential to be fully asynchronous, 
 particularly on networks that support one-sided communication natively, 
-such as InfiniBand or Cray Aries interconnects.
+such as InfiniBand, Fujitsu Tofu interconnect or Cray Aries interconnect.
 
 Different applications benefit from different combination of computation and 
 communication models. However, it is not easy to efficiently execute these models
@@ -49,15 +49,15 @@ on widely used message passing model, in order to address these issues existing
 in different programming models and consequently contribute efficient communication 
 approaches for various kinds of applications. 
 
-Firstly, in hybrid MPI+threads applications, a common mode of operation involves 
-using multiple threads to parallelize the computation, while one of the threads 
-issues MPI operations. Although such mode extremely improves floating point 
-performance for computation of applications by massive parallelism, it also 
-means that most of the threads are idle during MPI calls, which translate
-to underutilized hardware cores. Furthermore, since only single light-weight core 
-is contributing to communication, it may result in even performance degradation.
-In this thesis, we present an internally multithreaded MPI that transparently 
-coordinates with the threading runtime system to \textit{share
+Firstly, in hybrid MPI+threads applications, a common mode of operation for such 
+applications involves using multiple threads to parallelize the computation, 
+while one of the threads issues MPI operations. Although such mode extremely 
+improves floating point performance for computation of applications by massive 
+parallelism, it also means that most of the threads are idle during MPI calls, 
+which translateto underutilized hardware cores. Furthermore, since only single 
+light-weight core is contributing to communication, it may result in even 
+performance degradation. The first contribution of this thesis is an internally multithreaded 
+MPI that transparently coordinates with the threading runtime system to \textit{share
 idle threads with the application in order to parallelize MPI internal 
 processing} such as derived datatype communication, shared-memory communication, 
 and network I/O operations. 
@@ -71,8 +71,8 @@ and network I/O operations.
 Secondly, in MPI-only applications, such a mode not only suffers from the partitioning 
 of resources across processes, but also from loss of performance in a number 
 of ways. For example, if an MPI process is waiting for a message to arrive, 
-the core on which it is scheduled is idle and underutilized. In this thesis, 
-we plan to utilize the concept of user-level 
+the core on which it is scheduled is idle and underutilized. As the second 
+contribution of this thesis, we plan to utilize the concept of user-level 
 processes, a way to provide multiple co-scheduled ``OS processes'' on a 
 single core, so that \textit{a large number of MPI processes are able 
 to be executed on a single core} and achieve better load balancing and 
@@ -90,8 +90,7 @@ completion of operations have relied on a background thread that is
 dedicated to each MPI process. This approach, however, leads to wasted resources
 because half of the cores on a node must be designated to background threads. 
 Furthermore, this model forces multithreaded communication overhead on all MPI 
-operations, which can be expensive.
-In this thesis, we present 
+operations, which can be expensive. In this thesis, our third contribution is 
 a \textit{process-based asynchronous progress model for MPI on many-core 
 architectures utilizing dedicated helper cores}. This approach achieves better 
 flexibility that user is allowed to define any arbitrary breakup of how many 
