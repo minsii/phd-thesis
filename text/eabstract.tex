@@ -54,7 +54,7 @@ applications involves using multiple threads to parallelize the computation,
 while one of the threads issues MPI operations. Although such mode extremely 
 improves floating point performance for computation of applications by massive 
 parallelism, it also means that most of the threads are idle during MPI calls, 
-which translateto underutilized hardware cores. Furthermore, since only single 
+which translate to underutilized hardware cores. Furthermore, since only single 
 light-weight core is contributing to communication, it may result in even 
 performance degradation. The first contribution of this thesis is an internally multithreaded 
 MPI that transparently coordinates with the threading runtime system to \textit{share
@@ -95,7 +95,7 @@ a \textit{process-based asynchronous progress model for MPI on many-core
 architectures utilizing dedicated helper cores}. This approach achieves better 
 flexibility that user is allowed to define any arbitrary breakup of how many 
 cores are assigned to the user processes and how many are assigned as helper 
-cores without additional lock contention in thread-based design. Moreover, 
+cores without additional lock contention as that in thread-based design. Moreover, 
 PMPI-based redirection helps separate from any MPI implementation so that various 
 MPI implementations are able to be easily supported. 
 
