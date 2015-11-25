@@ -1,0 +1,135 @@
+% \section{Introduction}
+% \label{sec:caspter-intro}
+
+The MPI-2 and MPI-3 standards~\cite{mpi30-report} introduced one-sided
+communication semantics (also known as remote memory access or RMA)
+that allow one process to specify all communication parameters for
+both the sending and receiving sides.  Thus, a process can access
+memory regions of other processes in the system without the target
+process explicitly needing to receive or process the message.  RMA
+provides an alternative model to traditional two-sided or group
+communication models and can be more natural for some applications to
+use~\cite{dinan12:armci_mpi}.
+
+While the RMA model is useful for a number of communication patterns,
+the MPI standard does not guarantee that such communication is
+asynchronous.  That is, an MPI implementation might require
+the remote target to make MPI calls in order to ensure communication
+progress to complete any RMA operations issued on it as a target.
+This requirement is common in many MPI implementations.
+Specifically, most network interfaces do not natively support complex
+one-sided communication operations.  For example, networks such as
+InfiniBand provide contiguous PUT\slash GET operations only in
+hardware.  Thus, any contiguous PUT\slash GET MPI RMA communication
+can be implemented almost entirely in hardware, allowing the hardware
+to fully handle its progress semantics.  On the other hand, if the
+application developer wants to do an accumulate operation on a 3D
+subarray, for instance, such an operation must be done in software
+within the MPI implementation.  Consequently, the operation cannot
+complete at the target without explicit processing in software and
+thus may cause arbitrarily long delays if the target process is busy
+computing outside the MPI stack.
+
+To ensure asynchronous completion of operations (i.e., ``asynchronous
+progress''), traditional implementations have relied on two models.
+The first is to utilize background threads~\cite{mpi2-thread}
+dedicated to each MPI process in order to handle incoming messages
+from other processes (e.g., used by most MPI implementations including
+MPICH~\cite{mpich}, MVAPICH~\cite{mvapich}, Intel MPI~\cite{intelmpi},
+and IBM MPI on Blue Gene/Q~\cite{bgq-mpi}). While this model is a
+generic approach for all communication models, it has several drawbacks.
+For example, it is limited with the address space sharing that the operating system
+provides.  Specifically, a background thread can make progress
+for only one MPI process (i.e., the process to which it belongs) and thus
+requires at least as many background threads as the number of MPI
+processes.  On current MPI implementations, where the MPI library
+polls on the network to look for messages, this approach can waste half the
+hardware threads or cores.  Furthermore, this model forces
+multithreaded communication overhead on all MPI operations, which can
+be expensive~\cite{thread-safety}.
+
+The second model is to utilize hardware interrupts to awaken a kernel
+thread and process the incoming RMA messages within the interrupt
+context (e.g., used by Cray MPI~\cite{craympi} and IBM MPI on Blue
+Gene/P~\cite[Chapter~7]{ibmmpibgp}).  While this model does not have
+the large number of wasted cores or multithreaded communication
+overhead of the background thread approach, it is limited in that each
+message that requires target-side processing generates an interrupt,
+which can be expensive.  Perhaps more fundamental, the model of
+hardware interrupts is centered on the notion that all
+hardware resources are busy with user computation, which needs to be
+\emph{interrupted} to inject computation related to asynchronous
+progress.  We believe this is not the right point of view for modern
+many-core architectures where the number of cores is very large.
+
+In this paper we present ``Casper,'' a process-based asynchronous
+progress solution for MPI on multi- and many-core architectures.
+An alternative to traditional thread- and interrupt-based
+models, Casper provides a distinct set of benefits for applications,
+ which we believe are more appropriate for large many-core
+architectures.  Unlike traditional approaches, the philosophy of the
+Casper architecture is centered on the notion that since the number of
+cores in the system is growing rapidly, dedicating some of
+the cores for helping with asynchronous progress might be better
+than using an interrupt-based shared-mode model.  Similarly, the use
+of processes rather than threads allows Casper to control the amount
+of sharing, thus reducing thread-safety overheads associated with
+multithreaded models, as well as to control the number of cores being
+utilized for asynchronous progress.
+
+The central idea of Casper is the ability of processes to share
+memory by mapping a common memory object into their address spaces
+by using the MPI-3 shared memory windows interface.  Specifically, Casper
+keeps aside a small user-specified number of cores on a multi- or
+many-core environment as ``ghost processes.''  When the application
+process tries to allocate a remotely accessible memory window, Casper
+intercepts the call and maps such memory into the ghost processes'
+address space.  Casper then intercepts all RMA operations to the user
+processes on this window and redirects them to the ghost processes
+instead.
+
+Since the user memory regions are not migrated or copied but just
+mapped into the ghost processes' address space, RMA operations that
+are implemented in hardware see no difference in the way they behave.
+On the other hand, RMA operations that require remote software
+intervention can be executed in the ghost processes' MPI stack on the
+additional cores kept aside by Casper, without requiring any
+intervention from the application processes.
+
+Although the core concept of Casper is straightforward, the design and
+implementation of such a framework must take several aspects into
+consideration.  Most important, the framework needs to ensure that
+correctness is maintained as required by the MPI-3 semantics.  While this task is
+easy to manage for simple applications, the wide variety of
+communication and synchronization models provided by MPI can make the task
+substantially more complex for applications that are nontrivial.
+This task is even more complicated for applications that use multiple
+MPI-3 epoch types (e.g., passive-target and active-target) or multiple
+windows of remote memory buffers because the same Casper ghost
+processes need to maintain progress on all of them, thus essentially
+requiring that they never indefinitely block inside an MPI operation.
+Furthermore, when more than one ghost process is present, the Casper
+architecture must ensure that the ordering, atomicity, and memory
+consistency requirements specified by the MPI-3 standard are met in a
+way that is transparent to the application.
+
+The Casper architecture hides all this complexity from the user and
+manages it internally within its runtime system.  In some
+cases, however, such complexity can cause performance overhead.  In this paper
+we present various techniques we used to ensure correctness while
+retaining the performance of the RMA operations and enabling
+low-overhead asynchronous progress.  In addition to a detailed design
+of the Casper architecture, we present
+experiments evaluating and analyzing Casper with various
+microbenchmarks and a large quantum chemistry application.
+
+\textbf{\em Recommended reading:} While this paper provides some
+information on the MPI RMA semantics, it is not meant to be a
+comprehensive description.
+In order to better understand the subtle
+characteristics and capabilities of MPI RMA on which this paper
+relies,
+we highly recommend
+reading past papers and books that more
+thoroughly discuss these semantics (e.g., \cite{hoefler13:mpi3-rma,
+  gropp99:using-mpi-2}).

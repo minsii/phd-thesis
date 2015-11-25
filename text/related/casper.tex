@@ -1,0 +1,70 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{MPI One-sided Communication and Asynchronous Progress}\label{sec:related-casper}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Asynchronous progress in MPI has been previously explored by the
+community for both two-sided and one-sided communication using
+multiple approaches.  Sur et al.~\cite{async-rdmaread} discussed an
+interrupt-based design to overlap remote direct memory access
+read-based rendezvous communication with computation on InfiniBand
+networks.  Kumar et al.~\cite{async-p2p} improved this work by proposing a
+signal-based approach to both reduce the number of interrupts and
+avoid using locks for shared data.
+
+In one-sided communication, although networks such as InfiniBand
+provide contiguous PUT\slash GET operations in hardware, noncontiguous
+data transfers and accumulate operations still require the
+participation of the target process to perform an unpacking stage from
+a contiguous receiving buffer into the noncontiguous target location.
+Jiang et al.~\cite{mpi2-thread} proposed a thread-based design to enable
+asynchronous progress in communications involving noncontiguous data
+types in one-sided networks.  Vaidyanathan et al.~\cite{async-ipdps2014}
+improved asynchronous progress on Intel Xeon Phi coprocessors using a
+similar approach but were able to minimize threading overhead by
+implementing only a subset of the MPI standard and discarding some
+requirements of the standard.
+
+PIOMan~\cite{pioman-task}, a multithreaded communication progression
+engine supporting asynchronous progress, divides I/O communication and
+rendezvous handshakes into multiple tasks and offloads them to
+background threads running on idle cores in order to overlap
+communication and computation.  This approach, however, suffers from a
+nonnegligible overhead derived from the necessary multithreading
+safety mechanisms~\cite{pioman-mt-overhead}.  In addition, to the best
+of our knowledge, the PIOMan project does not target one-sided
+communications.
+
+Other research has focused on improving communication overlap using
+network hardware features.  Santhanaraman et al.~\cite{mva-true-oneside}
+optimized internode one-sided passive-mode synchronization using
+InfiniBand atomic operations, thus providing applications with improved
+overlap.  Realizing that intranode communication is highly processor
+demanding, Zounmevo and Afsahi~\cite{zounmevo2014intra} proposed to overlap intra and
+internode one-sided communications by deferring the former messages
+falling under a certain message size threshold to the end of the
+epoch.  By issuing network transfers to RDMA-assisted networks in
+first place, the processor-expensive intranode data movements are can
+be overlapped when issuing them subsequently.
+
+%% \paragraph{Thread-based MPI Implementations}  Thread-based MPI
+%% implementations show the possibility of implementing asynchronous
+%% progress without deploying additional threads.  MPC~\cite{mpc-async}
+%% presents a collaborative polling design on top of its thread-based MPI
+%% implementation.  Since MPI processes are running as operating-system
+%% threads, an MPI process is able to collaborate on the message
+%% progression of any other MPI process located on the same compute node
+%% because of being within the same operating-system process.  However,
+%% to leverage this approach in a regular process-based MPI runtime, the
+%% internal communication structures would have to be shared among
+%% processes located on the same node carefully deploying intra-node
+%% process communication and protection mechanisms, bearing with the
+%% overhead that would entail.
+
+%% Our solution, Casper, provides asynchronous progress for one-sided
+%% communication using ghost processes, which provides a distinct set of
+%% benefits for applications which we believe are more appropriate for
+%% large many-core architectures.  Specifically, it avoids the core usage
+%% and threading overhead limitations of existing thread-based approaches
+%% while at the same time not relying on interrupts which are
+%% fundamentally designed for shared-mode platforms where multiple
+%% processes or threads share the available cores.

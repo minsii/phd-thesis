@@ -1,0 +1,99 @@
+% \section{Introduction}\label{sec:mtmpi-intro}
+
+Although multicore processor chips are the norm today, architectures
+such as the Intel Xeon Phi take such chips to a new level of
+parallelism, with dozens of cores and hundreds of hardware threads.
+With the number of processing cores increasing at a faster rate than
+are other resources in the system (e.g., memory), application
+programmers are looking at hybrid programming models, comprising a
+mixture of processes and threads, that allow resources on a node to be
+shared between the different threads of a process.  In such models,
+one or more threads utilize a distributed-memory programming system,
+such as MPI, for their data communication.  The most prominent of the
+threading models used in scientific computing today is
+OpenMP~\cite{openmp}.  In OpenMP, the application developer annotates
+the code with information on which statements need to be parallelized
+by the compiler and the associated runtime system.  The compiler, in
+turn, translates these annotations into semantic information that the
+runtime system can use to schedule the computational work units on
+multiple threads for parallel execution.
+
+A common mode of operation for hybrid MPI+OpenMP applications involves
+using multiple threads to parallelize the computation, while one of
+the threads issues MPI operations (i.e., MPI \texttt{FUNNELED} or
+\texttt{SERIALIZED} thread-safety mode).  This is achieved, for
+example, by placing MPI calls in OpenMP critical sections or outside
+the OpenMP parallel regions.  However, such a model often means that
+the OpenMP threads are active only in the computation phase and idle
+during MPI calls, resulting in wasted computational resources.  These
+idle threads translate to underutilized hardware resources on
+massively parallel architectures.
+
+In this paper, we present MT-MPI, an internally multithreaded MPI
+implementation that transparently coordinates with the threading
+runtime system to share idle threads with the application.  We
+designed MT-MPI in the context of OpenMP, which serves as a common
+threading runtime system for the application and MPI.  MT-MPI employs
+application idle threads to boost MPI communication and
+data-processing performance and increases resource utilization.  While
+the proposed techniques are generally applicable to most many-core
+architectures, in this paper we focus on Intel Xeon Phi as the
+architectural testbed (in ``native mode,'' where applications are
+executed directly on the coprocessor).
+
+To demonstrate the performance benefits of the proposed approach, we
+modified the Intel OpenMP runtime
+(http://\linebreak{}www.openmprtl.org) and the MPICH implementation
+of MPI (http://www.mpich.org).  Specifically, we modified the MPI
+implementation to parallelize its internal processing using a
+potentially nested OpenMP parallel instantiation (i.e., one OpenMP
+parallel block inside another).  We studied new algorithms for various
+internal processing steps within MPI that are more ``parallelism
+friendly'' for OpenMP to use.  In theory, such a model would allow
+both the application and the MPI implementation to expose their
+parallelism requirements to the OpenMP runtime, which in turn can
+schedule them on the available computational resources.  In practice,
+however, this has multiple challenges:
+
+\begin{enumerate}
+\setlength{\parskip}{-0.2ex}
+\vspace{-1.2ex}
+
+\item The modified algorithms for internal MPI processing, while
+  efficient for OpenMP parallelism, are in some cases not as efficient
+  for sequential processing.  Consequently, they can improve
+  performance only when sufficient OpenMP parallelism is available.
+  However, the actual number of threads that will be available at
+  runtime is unknown.  Depending on the application's usage of
+  threads, this can vary from none to all threads being available to
+  MPI for processing.  Thus, if not designed carefully, the algorithms
+  can perform worse than the traditional sequential implementation of
+  MPI.
+
+\item Unfortunately, the current implementation of the Intel OpenMP
+  runtime does not schedule work units from nested OpenMP parallel
+  regions efficiently.  It simply creates new pthreads for each nested
+  parallel block and allows the operating system to schedule them on
+  the available cores.  This results in creating more threads than the
+  available cores, and degrading performance.
+
+\vspace{-1.2ex}
+\end{enumerate}
+
+To work around these limitations, we modified the Intel OpenMP runtime
+to expose information about the idle threads to the MPI
+implementation.  The MPI implementation uses this information to
+schedule its parallelization only when enough idle resources were
+available.  Furthermore, such information allows the MPI
+implementation to selectively choose different algorithms that trade
+off between parallelism and sequential execution in order to achieve
+the best performance in all cases.
+
+We present our parallelization designs for three different parts
+within the MPI implementation: (1) packing and unpacking stages
+involved in derived datatype processing and communication, (2)
+shared-memory data movement in intranode communication, and (3)
+network I/O operations on InfiniBand.  We also present a thorough
+experimental evaluation, validation, and analysis using a variety of
+micro- and macrokernels, including 3D halo exchanges, NAS MG
+benchmark, and the Graph500 benchmark~\cite{graph500}.

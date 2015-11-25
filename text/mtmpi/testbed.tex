@@ -1,0 +1,25 @@
+\section{Testbed Setup}
+\label{sec:testbed}
+
+% Please verify I'm not lying. Note that the first platform lacks the
+% CPU details
+In our experiments we used two different platforms:
+\begin{itemize}
+\item The first platform is a single node equipped with
+  six-core Intel Xeon X5680 CPUs, 20~GB of main
+  memory, and two Intel Xeon Phi Knights Corner cards (stepping B0,
+  61 cores) featuring 8~GB of GDDR5 RAM (5.5 GT/s) connected to
+  16-lane PCIe 2.0 ports under the same PCIe root.
+\item The second platform is a cluster composed of 8 compute nodes
+  featuring dual Intel Xeon E5-2670 CPUs, 64~GB of RAM, and a single Knights
+  Corner card (stepping B1, 60 cores) with 8~GB of on-board RAM (5.0 GT/s)
+  connected to a 16x PCIe 2.0 port. The nodes are connected through an
+  InfiniBand QDR fabric.
+\end{itemize}
+All nodes run the Linux kernel version 2.6.32. 
+%In addition, all MIC cards are pre-production revisions.
+%note: B1 is production
+
+The first platform lets us evaluate intranode MIC-to-MIC data
+transfers, while the second platform provides a distributed
+environment for evaluating internode transfers. 

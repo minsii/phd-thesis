@@ -1,0 +1,84 @@
+% \section{Introduction}
+% \label{sec:intro}
+In our previous work~\cite{casper}, we proposed ``Casper,''
+a process-based asynchronous progress solution for MPI on multi- and
+many-core architectures. An alternative to traditional thread- and
+interrupt-based models, Casper provides a distinct set of benefits
+for applications, which we believe are more appropriate for large
+many-core architectures. The philosophy of the Casper architecture
+is centered on the notion that since the number of cores in the system
+is growing rapidly, there can be always a few idle cores during the
+execution, thus dedicating them for helping with asynchronous progress
+might be better than using an interrupt-based model. Similarly, the use
+of processes rather than threads allows Casper to control the amount
+of sharing, thus reducing thread-safety overheads associated with
+multithreaded models, as well as to control the number of cores being
+utilized for asynchronous progress.
+
+The central idea of Casper is the ability of processes to share
+memory by mapping a common memory object into their address spaces
+by using the MPI-3 shared memory windows interface.  Specifically, Casper
+keeps aside a small user-specified number of cores on a multi- or
+many-core environment as ``ghost processes.''  When the application
+process tries to allocate a remotely accessible memory window, Casper
+intercepts the call and maps such memory into the ghost processes'
+address space.  Casper then intercepts all RMA operations to the user
+processes on this window and redirects them to the ghost processes
+instead.
+
+We have evaluated Casper by using various micro-benchmarks and a real
+quantum chemistry application, NWChem, and shown significant performance
+improvement in our previous work. However, the performance is still not
+ideal. Although we have achieved signification improvement in some
+computation-intensive phase such as the time-consuming (T) portion in
+the ``gold standard'' CCSD(T) simulation~\cite{casper}\cite{casper-scaling},
+we also observe performance degradation in some communication-intensive
+phases such as CCSD iteration. This is because, in communication-intensive
+phases, the asynchronous progress may not be necessary since the target
+processes can frequently make MPI calls and thus handle the operations
+issued to them as targets by themselves. Furthermore, when the amount of RMA
+operations becomes large, the operation redirection in Casper can even
+result in over workload issue. That is, a large amount of operations
+were originally issued to different user target processes, but are
+redirected to a few ghost processes in Casper. Such situation can result in
+communication performance degradation if the performance benefit from
+asynchronous progress is less than the performance loss in the operation
+overloading on ghost processes.
+
+In this paper, we propose an adaptation mechanism for Casper, providing
+the capability to dynamically adapt the asynchronous progress
+for multiple execution phases performing varying communication characteristics.
+The adaptation approach allows application to dynamically redirect all
+RMA communication to the ghost processes for computation-intensive phase
+that requiring efficient asynchronous progress, with avoiding inefficient
+redirection for communication-intensive phase.
+We note that, the cores dedicated to background ghost processes are always
+kept aside from the application even when the asynchronous progress is disabled.
+
+\mynote{Challenge.}
+
+We summarize the contribution of this paper as follows:
+\begin{itemize}
+\item Deep performance analysis of the widely used CCSD and CCSD(T)
+simulations in NWChem for two problem systems: the water system and
+the acenes molecule system.
+
+\item Two dynamic adaptation approaches for Casper asynchronous
+progress: a user-guided approach and a transparent self-profiling
+based approach.
+
+\item Comprehensive comparison between the adaptation approaches in
+the CCSD(T) simulation.
+\end{itemize}
+
+% The rest of the paper is organized as follows: Section~\ref{sec:des-basic}
+% first gives an overview of the basic design of Casper. Then
+% Section~\ref{sec:eva-nwchem} presents the deep analysis of the performance
+% characteristics of NWChem and discusses the limitation of static asynchronous
+% progress. Section~\ref{sec:des-adpt} introduces the detailed design of two
+% dynamic adaptation approaches proposed in this paper, and followed by the
+% comprehensive performance analysis in microbenchmarks and NWChem in
+% Section~\ref{sec:eva-micro} and ~\ref{sec:eva-nwchem-adpt} respectively.
+% The related researches are introduced in Section~\ref{sec:related}, and
+% finally this paper is concluded in Section~\ref{sec:concl} with a discussion
+% of future work.

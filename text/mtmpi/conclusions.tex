@@ -1,0 +1,14 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Conclusions}\label{sec:concl}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+In this paper we analyzed the potential benefits of employing idle
+hardware threads to accelerate MPI processing in hybrid MPI+OpenMP
+applications on massively parallel many-core architectures.  To
+this end, we modified two widely deployed
+implementations of these models: the Intel OpenMP runtime and MPICH
+MPI implementation. We described various optimizations in different
+parts of MPI implementation, including derived datatype processing,
+shared-memory communication, and IB network operations.  Our
+experimental evaluation, based on several micro- and macrokernels,
+demonstrates considerable performance benefits.

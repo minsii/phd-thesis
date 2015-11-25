@@ -1,0 +1,109 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Brief Overview of MPI RMA Semantics}\label{sec:back}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+RMA communication in MPI was first introduced in the MPI-2 standard,
+though it went through substantial changes in the MPI-3 standard.  The
+term ``one-sided'' refers to the number of processes explicitly
+implicated in the communication process.  In the traditional two-sided
+or group communication approaches, all involved endpoints are required
+to actively participate in the operation by calling send\slash receive
+functions or collective operations.  The one-sided operation mode,
+however, enables the communication to be performed by a single process
+without an explicit action from the target.  Hence, the process that
+issues the operation has to know both the source and the destination
+location of the data to be moved or computed on.  This process is
+called the ``origin''.  The process that hosts the memory being
+accessed by an origin is called the ``target''.  It is possible for
+the origin and target to be the same in which case a process is
+accessing its own memory through RMA operations.
+
+MPI RMA calls operate on the so-called \textit{memory windows}, which
+are memory regions exposed by a process for RMA communication by other
+processes within a group.  Four window creation functions are defined
+by the MPI-3 standard to accommodate different use cases.
+\fn{MPI\_WIN\_CREATE} allows the application to provide its own buffer
+for the exposed memory window.  \fn{MPI\_WIN\_ALLOCATE} and
+\fn{MPI\_WIN\_ALLOCATE\_SHARED}, on the other hand, allow the MPI
+implementation to allocate a new buffer for the window to be exposed,
+thus allowing the implementation to make various optimizations such as
+allocating shared memory regions, network-registered memory regions,
+or symmetric virtual memory allocations.
+\fn{MPI\_WIN\_ALLOCATE\_SHARED} further permits all processes in the
+window to access the allocated buffer with direct load\slash store
+operations instead of RMA operations.  Finally,
+\fn{MPI\_WIN\_CREATE\_DYNAMIC} creates a memory window with no memory
+attached initially, but with the ability for the user to attach and
+detach memory dynamically.
+
+Once memory is exposed for MPI RMA, it can be accessed with a number
+of operations such as \fn{MPI\_PUT}, \fn{MPI\_GET},
+\fn{MPI\_ACCUMULATE} and \fn{MPI\_GET\_ACCUMULATE}.  As the names
+suggest, \fn{MPI\_PUT} and \fn{MPI\_GET} operations are used to
+put/get data to/from a remote target location.  \fn{MPI\_ACCUMULATE}
+and \fn{MPI\_GET\_ACCUMULATE} are similar to \fn{MPI\_PUT} and
+\fn{MPI\_GET}, except that they also perform one of the MPI predefined
+operations on the target memory (such as a summation or maximum
+computation).  These operations, which are classified as
+``accumulate-style operations'', are also special in that they have
+well-defined ordering and atomicity semantics, details of which can be
+found in~\cite{mpi30-report}.
+
+All MPI RMA communication operations are nonblocking in nature and
+need to be completed using explicit synchronization calls.  There are
+three core synchronization concepts that the reader of this paper
+should be aware of.  The first concept is that of epochs.  Epochs mark
+the period of time when a window is accessible by an origin through
+RMA operations.  That is, all MPI RMA communication operations must be
+issued between the start and end of an epoch.  MPI defines two
+categories of epochs: \emph{active target} and \emph{passive target}.
+In active target epochs (namely, \emph{fence} and \emph{PSCW}
+(post--start--complete--wait)) the target actively participates in the
+opening and closing of an epoch, while in passive target epochs
+(namely, \emph{lock-unlock} and \emph{lockall-unlockall}) the origin
+handles the opening and closing of the epoch for the target.  Loosely
+speaking, the closing of an epoch ensures that all MPI RMA
+communication operations have completed both locally and
+remotely.\footnote{There are exceptions to the remote completion rule
+  within the \emph{fence} and \emph{PSCW} epochs, but those exceptions
+  are not important for this paper.}
+
+Since the origin completely handles the epoch management without any
+coordination with other origins in passive target epochs, the user has
+to be careful to avoid overwriting data from multiple origins
+targeted at the same memory location.  To help with such
+synchronization, MPI allows the \emph{lock-unlock} epoch to specify a
+permission type: shared or exclusive.  When an origin opens an epoch
+in exclusive mode, no other origin can access that window at the same
+time.  When an origin opens an epoch in shared mode another origin can
+access that window at the same time, but only when it also opens the
+epoch in shared mode.  The \emph{lockall-unlockall} epoch type only
+allows shared mode access.
+
+The second synchronization concept is of RMA communication
+synchronization calls within an epoch: \fn{MPI\_WIN\_FLUSH},
+\fn{MPI\_WIN\_FLUSH\_ALL}, \fn{MPI\_WIN\_FLUSH\_LOCAL} and
+\fn{MPI\_WIN\_FLUSH\_LOCAL\_ALL}.  These calls are specific to passive
+target epochs and allows users to force completion of operations
+(either local or remote) without ending an epoch.
+
+The third synchronization concept is that of \fn{MPI\_WIN\_SYNC}.
+This function does not complete any RMA communication operations, but
+is only used for managing memory consistency.  Specifically, this call
+ensures consistent ordering of load/store operations by both the
+compiler and the processor architecture, i.e., the compiler or the
+processor hardware cannot reorder load or store operations across an
+\fn{MPI\_WIN\_SYNC} call.
+
+%% Apart from the basic functionality of the above described operations,
+%% MPI RMA also provides two models for the user to give hints about her
+%% communication semantics: \emph{info} and \emph{asserts}.  \emph{info}
+%% arguments are broad-sweeping hints that apply to an entire window and
+%% all operations issued on a window.  \emph{assert} hints are more
+%% focused in scope and typically apply to each epoch.  These hints are,
+%% in essence, user commitments to comply with different restrictions
+%% which allow the MPI implementation to potentially leverage different
+%% optimizations.  For instance, users can specify that an
+%% \fn{MPI\_WIN\_FENCE} call does not have any preceding RMA
+%% communication operations that it needs to complete, thus allowing the
+%% MPI implementation to reduce some synchronization requirements.

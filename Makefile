@@ -5,8 +5,8 @@
 #
 
 HEADER=thesis
-PICS=figures
-BIB=bib
+PICS=figures figures/mtmpi figures/casper figures/adpt-casper
+BIB=.
 TEX=text
 
 TARGETS: $(HEADER).pdf
@@ -20,13 +20,25 @@ pic_files = $(shell find $(PICS) \
 		-or \( -name '*.fig' -print \) -or \( -name '*.pdf' -print \) \
 	)
 
-thesis.pdf: thesis.dvi
-	dvipdfmx thesis
-thesis.dvi: $(HEADER).tex $(tex_files) $(bib_files) $(pic_files)
-	platex thesis
-	# bibtex thesis
-	platex thesis
-	platex thesis
+# thesis.pdf: thesis.dvi
+# 	dvipdfmx thesis
+
+# $(HEADER).dvi: $(HEADER).tex $(tex_files) $(bib_files) $(pic_files)
+$(HEADER).pdf: $(HEADER).tex $(tex_files) $(bib_files) $(pic_files)
+	# platex $(HEADER)
+	# bibtex $(HEADER)
+	# platex $(HEADER)
+	# platex $(HEADER)
+	@if test "`which rubber`" != "" ; then \
+		TEXMFOUTPUT=`pwd` rubber -d -f -Wrefs -Wmisc $(HEADER) ; \
+	else 	\
+		pdflatex $(HEADER) | tee latex.out ; \
+		bibtex $(HEADER); \
+		touch .rebuild; \
+		pdflatex $(HEADER) | tee latex.out; \
+		pdflatex $(HEADER) | tee latex.out; \
+		rm -f latex.out ; \
+	fi
 
 clean:
 	@if test "`which rubber`" != "" ; then \

@@ -1,4 +1,39 @@
-\documentclass[doctor,interim,11pt]{iscs-thesis}
+%&latex
+\documentclass[doctor,final,11pt]{iscs-thesis}
+% \usepackage[whole]{bxcjkjatype}
+\usepackage{graphicx}
+\usepackage{soul, color}
+\definecolor{darkgray}{rgb}{0.95,0.95,0.95}
+\usepackage{listings}
+\lstloadlanguages{C}
+\lstset{language=C}
+\lstset{backgroundcolor=\color{darkgray}}
+\lstset{basicstyle=\scriptsize\tt}
+\lstset{framexleftmargin=5pt}
+\lstset{keywordstyle=\bfseries\bf\color{blue}}
+\usepackage{array}
+\usepackage{fancybox}
+\usepackage{tikz}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{url}
+\def\UrlBreaks{\do\/\do-}
+\usepackage{enumerate}
+\usepackage[tight,scriptsize]{subfigure}
+\usepackage{natbib}
+\usepackage{multirow}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{minitoc}
+%\usepackage{showframe}
+% \usepackage{hyperref}
+% \hypersetup{
+%     colorlinks,
+%     linktoc=all,
+%     linkcolor=black,
+%     citecolor=black,
+% }
+
+
 % \usepackage{showframe}
 
 %-------------------
@@ -18,6 +53,14 @@
 \special{papersize=8.27in,11.69in} % A4
 
 
+\newcommand{\fn}[1]{\textbf{\small #1}}
+\newcommand{\farg}[1]{\textbf{\small #1}}
+\newcommand{\emp}[1]{\textbf{#1}}
+\newcommand{\parahead}[1]{\medskip\noindent\textbf{#1}}
+\newcommand{\parasubhead}[1]{\smallskip\noindent\textbf{#1}}
+\newcommand{\mynote}[1]{\textcolor{red}{[#1]}}
+\newcommand{\libname}{Casper}
+
 \begin{eabstract}
 \input{text/eabstract}
 \end{eabstract}
@@ -26,5 +69,29 @@
 \end{jabstract}
 
 \maketitle
+
+\begin{acknowledge}
+% I would like to thank my adviser, Prof. Yutaka Ishikawa for guiding me patiently throughout the duration of my master study.
+
+
+\end{acknowledge}
+
+\frontmatter %% 前付け
+\tableofcontents % 目次
+\listfigurename
+\listtablename
+
+\mainmatter %% 本文
+\input{text/intro}
+\input{text/background}
+% \input{text/mtmpi}
+% \input{text/casper}
+% \input{text/adpt-casper}
+% \input{text/ulp}
+% \input{text/related}
+% \input{text/conclusion}
+
+\bibliographystyle{plain} % 参考文献
+\bibliography{bib/myref}
 
 \end{document}

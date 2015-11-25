@@ -1,0 +1,27 @@
+\begin{abstract}
+
+In this paper we present ``Casper,'' a process-based asynchronous
+progress solution for MPI one-sided communication on multi- and
+many-core architectures.  Casper uses transparent MPI call redirection
+through PMPI and MPI-3 shared-memory windows to map memory from
+multiple user processes into the address space of one or more ghost
+processes, thus allowing for asynchronous progress where needed while
+allowing native hardware-based communication where available.  Unlike
+traditional thread- and interrupt-based asynchronous progress models,
+Casper provides the capability to dedicate an arbitrary number of
+ghost processes for asynchronous progress, thus balancing application
+requirements with the capabilities of the underlying MPI
+implementation.  We present a detailed design of the proposed
+architecture including several techniques for maintaining correctness
+per the MPI-3 standard as well as performance optimizations where
+possible.  We also compare Casper with traditional thread- and
+interrupt-based asynchronous progress models and demonstrate its
+performance improvements with a variety of microbenchmarks and a
+production chemistry application.
+
+\end{abstract}
+
+
+\begin{IEEEkeywords}
+MPI ghost process; one-sided communications; RMA; multi-core; many-core; asynchronous progress;
+\end{IEEEkeywords}

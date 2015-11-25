@@ -1,0 +1,617 @@
+\section{Ensuring Correctness and Performance}
+\label{sec:correctness}
+
+In this section we discuss several cases that we need to handle
+inside Casper in order to maintain correctness as specified in the MPI-3
+standard while achieving high performance.
+
+With respect to performance optimizations, some of the proposed
+optimizations are automatically detected and handled by the Casper
+implementation, while some others are based on user hints in the form
+of either \emph{info} hints or \emph{assert} hints, as specified by
+the MPI standard.  Both \emph{info} and \emph{assert} hints are, in
+essence, user commitments to comply with different restrictions that
+allow the MPI implementation to potentially leverage different
+optimizations. Specifically, \emph{info} hints are broad-sweeping and
+apply to an entire window and all operations issued on that window.
+Further, \emph{info} hints are extensible so each MPI implementation
+can add newer hint capabilities to improve its own performance.
+\emph{assert} hints, on the other hand, are more focused in scope and
+typically apply to each epoch.  They are also not as easily extensible
+to MPI implementation-specific hints.
+
+The \emph{info} hints used in Casper are not
+defined by the MPI-3 standard and are Casper-specific extensions.
+In contrast, the \emph{assert} hints used in Casper all are MPI-3 standard defined
+hints that we reuse with the same semantics as the standard.  Thus,
+\emph{hints} are compatible with other MPI implementations as well,
+even though some MPI implementations might not choose to take
+advantage of them.
+
+\subsection{Lock Permission Management for Shared Ghost Processes}
+\label{sec:shared-ghosts}
+
+Consider an environment where multiple application processes reside on
+different cores of the same node and thus share a ghost process.  In
+this case, all RMA communication to these application processes would
+be funneled through the same ghost process.  In such an environment if
+an origin wanted to issue an exclusive lock to more than one
+application process on the same node, such a step would result in multiple
+exclusive lock requests being sent from the origin to the same ghost
+process.  This is disallowed by the MPI standard---an origin cannot
+nest locks to the same target.  Similarly, if two origin processes
+issue exclusive locks to different application processes on the same
+node, this would result in multiple exclusive lock requests being sent
+from different origins to the same ghost process.  While this is
+correct according to the MPI standard, it would result in unnecessary serialization of all exclusive
+locks to processes on the same node, thus hurting performance
+significantly.
+
+To overcome this issue, Casper internally maintains separate
+overlapping windows for each user process on the node. In other words, if a
+ghost process is supporting $N$ user processes, it will create $N$
+overlapping windows.  Communication to the $i$th user process on each
+node goes through the $i$th window.  Thus, the number of internal
+overlapping windows created is equal to the maximum number of user
+processes on any node of the system.  Such overlapping windows allow
+Casper to carefully bypass the lock permission management in MPI when
+accessing different processes but to still take advantage of them while
+accessing the same process.  Since a single RMA communication
+operation cannot target multiple processes at the same time, we never
+run into a case where the bypassing of permission management across
+processes causes an issue.
+
+While this approach ensures correctness, it can be expensive for both
+resource usage and performance.  To alleviate this concern, we allow
+the user to use the info hint \texttt{epochs\_used} to specify a
+comma-separated list of epoch types that the user intends to use on that
+window.  The default value for this info key is all epoch types (i.e.,
+``fence,pscw,lock,lockall''); but if the user sets this value to a
+subset that does not include ``lock,'' Casper can use that information
+to create only a single overlapping window (apart from the
+user-visible window) for all its internal operations and reduce any
+overhead associated with lock permission management.
+
+
+%% \subsection{Self Lock Consistency}
+%% \label{sec:self-lock}
+
+%% In general, locks are nonblocking operations in that they do not need
+%% to wait till the lock is actually acquired.  The MPI implementation
+%% only needs to ensure that any future RMA operations are not issued to
+%% the target memory before the lock is actually acquired.  Self locks
+%% (i.e., when a process locks itself), however, are special in that they
+%% cannot return till the lock is actually acquired.  This requirement is
+%% because self locks allow applications to access their local memory
+%% directly using load\slash store operations instead of MPI RMA
+%% communication operations.  In such cases, the accesses are outside of
+%% MPI's control and thus the MPI implementation needs to make sure to
+%% acquire the lock before returning from the lock call thus forcing all
+%% load\slash store operations to happen after the lock is acquired.
+
+%% With Casper, lock operations are redirected to the ghost processes in
+%% order to maintain appropriate permissions in case other origins are
+%% trying to access the window at the same time.  This, however, means
+%% that the lock is no longer a self-lock, but to a remote process.
+%% Thus, the MPI implementation might choose to delay the lock
+%% acquisition or return from the lock call before the lock acquisition
+%% is complete.  At that point a process issuing load\slash store
+%% operations to itself can cause data correctness issues.
+
+%% To handle this issue, Casper performs two steps.  In the first step,
+%% it issues a lock to the ghost process.  However, since the
+%% acquisition of this lock might be delayed by the MPI implementation,
+%% Casper internally issues an additional 1-byte GET from the window and
+%% performs a flush to complete that operation.  This forced GET would,
+%% in essence, block till at least the lock is acquired since the GET
+%% operation cannot fetch data before the lock is acquired.  One issue
+%% with this approach is that the MPI-3 standard (page 456, line 39)
+%% states that data consistency is not guaranteed when a GET operation
+%% and an update operation (such as a PUT or ACCUMULATE operation) occur
+%% simultaneously at the same memory location.  Thus, if the user
+%% application is updating the same location as the one that is being
+%% fetched by the forced GET described above, data consistency is not
+%% guaranteed.  Such data inconsistency makes sense for the GET operation
+%% but seems to be an unnecessary restriction on the update operation,
+%% i.e., the update should still be valid in such cases.  As active
+%% members of the MPI Forum RMA working group, we believe this is an
+%% unintended oversight and should be fixed in the upcoming MPI-3.1 or
+%% MPI-4.0 standard.  However, in order to meet the strict wording of the
+%% standard, we need an alternative approach.  Therefore, in Casper, we
+%% allocate additional ``hidden bytes'' at the ghost process (depicted by
+%% the gray box in Figure~\ref{fig:deg-mem-map}) that are not exposed to
+%% the user application.  The additional force GET operation is issued on
+%% these hidden bytes thus guaranteeing that it cannot cause any
+%% potential corruption of user data.
+
+%% In the second step, now that the permission issue is managed by the
+%% lock at the ghost process, Casper issues a second self-lock at the
+%% origin process.  This lock does not manage any permissions (since it
+%% is guaranteed to be not competed), but is necessary for managing memory
+%% consistency through appropriate system-specific memory barriers that
+%% the MPI implementation might be required to do.
+
+%% While the above solution maintains correctness, it clearly adds
+%% additional lock acquisition overhead that can have performance
+%% implications.  In order to alleviate such performance impact, we use
+%% the info hint \texttt{no\_load\_store} to let the user specify when
+%% she does not intend to access the local window with load/store
+%% operations, i.e., all data movement to/from the remotely accessible
+%% memory will be done using MPI RMA operations.  With this hint, Casper
+%% would still issue the lock operation to the ghost process, but does
+%% not have to force acquire it.  Furthermore, Casper can skip the second
+%% self-lock completely since that is only needed for local load\slash
+%% store operations.
+
+%% The user can also use the \texttt{MPI\_MODE\_NOCHECK} assert (which is
+%% already specified in the MPI-3 standard) to help in this case.  The
+%% \texttt{MPI\_MODE\_NOCHECK} hint tells us that the user is
+%% guaranteeing that there will be no contention on the lock and hence on
+%% the access permissions to the window, thus removing the necessity for
+%% the force lock for permission management.
+
+%% As a side benefit, this hint also allows us to issue local PUT/GET
+%% operations directly instead of forwarding them to the ghost process,
+%% since we know that the ghost process would not be receiving any
+%% conflicting epochs at the same time.  It is still possible that the
+%% ghost process will receive a PUT/GET operation to the same location as
+%% the local PUT/GET operations, but the MPI standard already states that
+%% doing so can result in data corruption, which covers data conflicts
+%% within Casper as well.  We note that we do not use this optimization
+%% for accumulate-style operations since that would break the atomicity
+%% constraints enforced by the MPI standard.
+
+
+\subsection{Managing Multiple Ghost Processes}
+\label{sec:multi-ghost}
+
+In Casper, the user is allowed to configure a node with multiple ghost
+processes.  Doing so allows better sharing of work when the number of
+operations requiring such asynchronous progress is large.  However,
+such a configuration requires additional processing to maintain
+correctness.  A simple model in which all communication is randomly
+distributed across the different ghost processes has two issues that
+need to be handled: (1) lock permissions in the \emph{lock-unlock}
+epoch and (2) ordering and atomicity constraints for accumulate
+operations.
+
+When the \emph{lock-unlock} epoch type is used, Casper will internally
+lock all ghost processes on a node, when a lock operation for a
+particular application process is issued, in the hope of spreading
+communication across these ghost processes.  In practice, however,
+many MPI implementations might not acquire the lock immediately, instead
+delaying them to a future time (e.g., when an RMA communication operation
+is issued to that target).  Given this behavior, consider an
+application that simply does one \emph{lock-put-unlock}.  In this
+example, Casper might randomly pick a ghost process, thus picking one
+ghost process on one origin while picking a different ghost process on
+another origin.  For implementations that delay lock acquisition, this
+example would mean that the two ghost processes would get exclusive locks from
+two different origins to access the same memory location.  Since the
+lock management in MPI is unaware of the shared-memory buffers in
+Casper, both exclusive locks would be granted, resulting in data
+corruption.
+
+%% \newsavebox\multiHelperIssueOrigCode
+%% \begin{lrbox}{\multiHelperIssueOrigCode}
+%% \begin{lstlisting}[linewidth=0.83\columnwidth]
+%%   MPI_Win_lock(MPI_LOCK_EXCLUSIVE, P1, 0, win);
+%%   MPI_Put(..., P1, ...);
+%%   MPI_Win_unlock(P1, win);
+%% \end{lstlisting}
+%% \end{lrbox}
+%% \newsavebox\multiHelperIssueMtCode
+%% \begin{lrbox}{\multiHelperIssueMtCode}
+%% \begin{lstlisting}[linewidth=0.83\columnwidth]
+%%   MPI_Win_lock(MPI_LOCK_EXCLUSIVE, G1, 0, win);
+%%   MPI_Win_lock(MPI_LOCK_EXCLUSIVE, G2, 0, win);
+
+%%   /* Pick a random ghost process */
+%%   G = randomly_pick_ghost();
+%%   MPI_Put(..., G, ...);
+
+%%   MPI_Win_unlock(G1, win);
+%%   MPI_Win_unlock(G2, win);
+%% \end{lstlisting}
+%% \end{lrbox}
+
+%% \begin{figure}
+%% \begin{CenteredBox}
+%% \subfigure[User code]{
+%%   \usebox\multiHelperIssueOrigCode
+%% }
+%% \end{CenteredBox}
+%% \begin{CenteredBox}
+%% \subfigure[Casper translated code] {
+%%   \usebox\multiHelperIssueMtCode
+%% }
+%% \end{CenteredBox}
+%% \caption{Lock acquisitions issues with multiple ghost processes.}
+%% \label{code:multi-ghost-lock-issue}
+%% \vspace{-4.0ex}
+%% \end{figure}
+
+The second issue concerns the atomicity and ordering
+guarantees provided by the MPI standard for concurrent accumulate
+operations to the same location (see \cite{mpi30-report}, Section
+11.7.1).  Each basic datatype element of concurrent accumulate
+operations issued by the same or different origin processes to the
+same location of a target process must be performed atomically.
+Similarly, two accumulate operations from the same origin to the same
+target at the same memory location are strictly ordered.  In Casper,
+if a user process is served by a single ghost process, such atomicity
+is already provided by the MPI implementation.  If a user
+process is served by multiple ghost processes, however, they might
+simultaneously be accessing the same memory region, thus breaking both
+atomicity and ordering.
+
+To address these issue, Casper uses a two-phase solution.  The first
+phase is to provide a base ``static binding'' model in which each ghost
+process is statically assigned to manage only a subset of the remotely
+accessible memory on the node.  This model ensures correctness as per
+the MPI standard but can have some performance cost.  We propose two
+static binding approaches in this paper: rank binding and segment
+binding.  The second phase is to identify periods in the application
+execution where the issuing of some operations to ghost processes can
+be done in a more dynamic fashion.  In this section, we discuss both
+phases.
+
+\subsubsection{Static Rank Binding}
+With rank binding, each user process
+binds to a single ghost process, and any RMA operations issued to that
+user process are always directed to that ghost process.  Therefore,
+different origins locking the same target are redirected to the
+same ghost process, thus benefiting from MPI's internal permission
+management.  Similarly, different accumulate operations targeting the
+same user process are redirected to the same ghost process,
+thus benefiting from MPI's internal ordering and atomicity management.
+This model completely works around the problem with multiple ghost
+processes since each user application process is associated with
+only a single ghost process.  The disadvantage of this approach, however,
+is that if the amount of communication to the different user
+application processes is not uniform, one ghost process might get more
+work than the others get, thus causing load imbalance.
+
+\subsubsection{Static Segment Binding}  With segment binding, the total memory
+exposed by all the processes on the node is segmented into as many
+chunks as the number of ghost processes, and each chunk or segment is
+bound to a single ghost process.  Thus, given a particular byte of
+memory, a single ghost process ``owns'' it.  When the user application
+issues a lock operation, Casper will still lock all ghost processes;
+but when the actual RMA communication operation is issued, it is
+redirected to the appropriate ghost processes that own that segment of
+the memory.  In this model different origin
+processes can get simultaneous access to the same target through
+different ghost processes.  However, they cannot simultaneously update
+the same memory region, thus making such shared access inconsequential
+and still guaranteeing application correctness.
+
+A second aspect that must be considered in segment binding is that
+segmentation must be at a basic-datatype-level granularity in order to maintain
+MPI's requirements for atomicity.  To handle this, we must ensure that
+segments are divided at an alignment of the maximum size of MPI basic
+datatypes (i.e., 16~bytes for \farg{MPI\_REAL}).  This alignment is needed in
+order to guarantee that no basic datatype is divided between two ghost
+processes.  Thus, although an operation may be divided into multiple
+chunks and issued to different ghost processes, each basic datatype
+unit belongs to a single chunk and is directed to a single ghost
+process, thus guaranteeing atomicity and ordering.  This approach
+will work in most cases since most compilers enable data alignment by
+default (i.e., a double variable has to be allocated on an address
+that is a multiple of eight).  Hence, it is safe to divide an
+operation into different aligned segments.  We note, however, that this
+approach is not strictly portable.  Compilers are allowed to not
+enforce data alignment or allow users to explicitly disable structure
+padding, resulting in unsafe segmentation.  Nevertheless, data
+alignment is always recommended for performance; and some
+architectures, such as SPARC \cite{sparc}, even require it for
+correctness.
+
+%% \begin{figure}
+%% \begin{CenteredBox}
+%% \begin{lstlisting}[linewidth=0.69\columnwidth]
+%% struct __attribute__((__packed__)) Foo {
+%%    char a;
+%%    double b;
+%% };
+%% \end{lstlisting}
+%% \end{CenteredBox}
+%% \caption{Padding disabled structure.}
+%% \label{code:no-padding}
+%% \end{figure}
+
+The advantage of the static segment binding model compared with the
+static rank binding model is that the load on a given ghost process is
+determined by the memory bytes it has access to, rather than the
+process it is bound to.  In some cases, such a model can provide
+better load balancing than the static rank binding model.  However,
+the static segment binding model
+has several disadvantages.  Most important, this solution relies on
+analyzing the specific bytes on the target process that are being
+accessed for each RMA operation.  For operations using contiguous
+datatypes that completely fall within one data segment, this model can
+be straightforward, since the operation is simply forwarded to the
+appropriate ghost process.  If the data overlaps two or more
+segments, however, Casper must internally divide the operation into
+multiple operations issued to different ghost processes.  This
+solution becomes even more complex when the data being transmitted is
+noncontiguous, in which case the datatype needs to be expanded and
+parsed before the segments it touches can be determined.
+
+\subsubsection{Dynamic Binding}  In applications that have balanced
+communication patterns, each target process on a compute node tends to
+receive an approximately equal number of RMA operations.  The best
+performance can be achieved for such patterns by equally distributing
+the number of processes handled by each ghost process.  In such cases,
+a static binding approach might be a good enough solution for load
+balancing.  For applications with more dynamic communication
+patterns, however, a more dynamic selection of ghost processes is needed, as
+long as such an approach does not violate the correctness requirements
+described above.
+
+In Casper, to help with dynamic binding, we define
+``static-binding-free'' intervals of time.  For example, suppose the
+user application issues a lock operation to a target. This lock would
+be translated to a lock operation to the corresponding ghost process to
+which the target process is bound.  After issuing some RMA communication
+operations, if the user application flushes the target,
+the MPI implementation must wait for the lock to be acquired
+and cannot delay the process of lock acquisition any further.  The period after the
+flush operation has completed and before the lock is released is
+considered a ``static-binding-free'' period.  That is, in this period
+we know that the lock has already been acquired.  In such periods, the
+Casper implementation no longer has to do lock permission management
+and is free to load balance PUT/GET operations to any of the ghost
+processes with the same lock type as that specified by the user
+application process.  We note that this optimization is not valid for
+accumulate-style operations, in order to maintain the atomicity and
+ordering guarantees specified by the MPI standard.
+
+We utilize three dynamic load-balancing approaches in Casper.  The
+first is a ``random'' algorithm that randomly chooses a ghost process
+from the available ghost processes for each RMA operation.  The second
+is an ``operation-counting'' algorithm that chooses
+the ghost process that the origin issued the least number of
+operations to.  The third is a ``byte-counting'' algorithm that
+chooses the ghost process that the origin issued the least number of
+bytes to.
+
+
+\subsection{Dealing with Multiple Simultaneous Epochs}
+\label{sec:multiwin}
+
+The MPI standard does not allow a process to simultaneously
+participate in multiple overlapping epoch types on a given window.
+However, for disjoint sets of processes or for the same set of
+processes with different windows, no such restrictions exist.
+Thus, one could imagine an application in which a few of the processes
+are participating in a \emph{lock-unlock} epoch on one window, while
+another disjoint set of processes is participating in a \emph{fence}
+epoch on another window.  If more than one of these processes are on
+the same node, the ghost processes have to manage multiple
+simultaneous epochs.  The primary difficulty with handling multiple
+simultaneous epochs, especially active target epochs such as
+\emph{fence} and \emph{PSCW}, is that the epoch opening and closing
+calls in these epochs are collective over either all or a subset of
+processes in the window and these calls are blocking with no
+nonblocking variants.  Thus, if a ghost process participates in one
+epoch opening or closing call, it is stuck in a blocking call and hence
+loses its ability to help with other epochs for other user processes.
+
+To work around this issue, Casper converts all active-target epochs
+into passive-target epochs on a separate window.  Further, it
+manages permission conflicts between \emph{lockall} and \emph{lock} by
+converting \emph{lockall} to a collection of \emph{lock} operations in
+some cases.  The following paragraphs describe these changes in more
+detail.
+
+\subsubsection{Fence}  The \emph{fence} call supports a simple
+synchronization pattern that allows a process to access data at all
+processes in the window.  Specifically, a fence call completes an
+epoch if it was preceded by another fence and starts an epoch if it is
+followed by another fence.
+
+In Casper, we translate \emph{fence} to a \emph{lockall-unlockall}
+epoch.  Specifically, we use a separate window for \emph{fence}; and
+when the window is allocated, we immediately issue a \emph{lockall}
+operation.  When the user application calls \emph{fence}, we
+internally translate it to \emph{flushall-barrier}, where the
+\emph{flushall} call ensures the remote completion of all operations
+issued by that origin and the \emph{barrier} call synchronizes
+processes, thus ensuring the remote completion of all operations by all
+origins.  This model ensures that the ghost processes do not need to
+explicitly participate in any active target synchronization calls,
+thus avoiding the blocking call issues discussed above.
+
+While correct, this model has a few performance issues.  First, a
+\emph{fence} call does not guarantee remote completion of operations.
+The return of the \emph{fence} call at a process guarantees only the
+%GWP is "at" a process the correct way to say this?
+local completion of operations issued by that process (as an origin)
+and the remote completion of operations issued to that process (as a
+target).  This is a weaker guarantee than what Casper provides,
+which is remote completion of all operations issued by all processes.
+Casper's stricter guarantees, while correct, do cost performance, however.
+Therefore, such
+remote completion through \emph{flushall} can be skipped if the user
+provides the \texttt{MPI\_MODE\_NOPRECEDE} assert indicating that
+no operations were issued before the \emph{fence} call that need
+to be flushed.
+
+Second, an MPI implementation can choose to implement \emph{fence} in
+multiple different ways.  For example, one possible implementation of
+the \emph{fence} epoch is to delay all RMA communication operations to
+the end of the epoch and issue them only at that time.  Thus, if the
+MPI implementation knows that a \emph{fence} call does not complete any
+RMA communication operations (e.g., if it is the first fence), it can
+take advantage of this information to avoid synchronizing the
+processes.  Casper does not have this MPI
+implementation internal knowledge, however.
+Thus, it always has to assume that the
+MPI implementation might issue the RMA communication operations
+immediately, and consequently it always has to synchronize processes.
+Again, doing so costs performance.  However, if the user specifies the
+\texttt{MPI\_MODE\_NOSTORE}, \texttt{MPI\_MODE\_NOPUT}, and
+\texttt{MPI\_MODE\_NOPRECEDE} asserts, Casper can skip such
+synchronization since there are no store operations before the
+\emph{fence} and no PUT operations after the \emph{fence} that might
+impact the correctness of the data.
+
+Third, when \emph{fence} is managed by the MPI implementation, it
+internally enforces memory consistency through appropriate memory
+barriers.  In Casper, since the \emph{fence} call is translated to
+passive-target synchronization calls, such memory consistency has to
+be explicitly managed.  Thus, during each \emph{fence} call, we add
+an additional call to \fn{MPI\_WIN\_SYNC} to allow such memory
+ordering consistency, costing more performance.
+
+\subsubsection{PSCW}  The \emph{PSCW} epoch allows small groups of
+processes to communicate with RMA operations.  It explicitly decouples
+calls in order to expose memory for other processes to access (exposure epoch)
+and calls to access memory from other processes (access epoch).  The
+\fn{MPI\_WIN\_POST} and \fn{MPI\_WIN\_WAIT} calls start and end an
+exposure epoch, while the \fn{MPI\_WIN\_START} and
+\fn{MPI\_WIN\_COMPLETE} start and end an access epoch.
+
+As with \emph{fence}, we translate the \emph{PSCW} epoch to
+passive-target synchronization calls on the same window (since
+\emph{fence} and \emph{PSCW} cannot simultaneously occur on the same
+window).  Also as with \emph{fence}, we add additional process
+synchronization for \emph{PSCW} in Casper. Instead of using
+\emph{barrier}, however, we use \emph{send-recv} because the processes involved
+might not be the entire group of processes on the window.
+Consequently, \emph{PSCW} encounters the same set of drawbacks as
+\emph{fence} with respect to performance.  To help with performance,
+we allow the user to provide the \texttt{MPI\_MODE\_NOCHECK} assert
+specifying that the necessary
+synchronization is being performed before \emph{post} and \emph{start} calls.
+When this assert is provided,
+Casper can drop additional synchronization.
+
+\subsubsection{Lockall}  The \emph{lockall} epoch is a passive-target
+epoch and thus does not require participation from the ghost
+processes.  However, we need to be careful that we do not
+bypass lock permission requirements when the user uses both
+\emph{lockall} and \emph{lock} simultaneously from different origin
+processes.  In this case, as discussed in
+Section~\ref{sec:shared-ghosts}, since the \emph{lock} calls are
+redirected to internal overlapping windows by Casper,
+one process of the application might end up acquiring a
+\emph{lockall} epoch while another process of the same application
+acquires an exclusive-mode \emph{lock} epoch on the same window (we
+note that the \emph{lockall} epoch is shared-mode only and does not
+have an exclusive-mode equivalent).  This situation is obviously incorrect and
+can cause data corruption.
+
+To avoid this, Casper internally converts the \emph{lockall} epoch to
+a series of locks to all ghost processes.  Doing so ensures that any
+accesses are correctly protected by the MPI implementation.
+Arguably, this solution can add some performance overhead since it
+serializes lock acquisition.  However, most MPI implementations delay
+lock acquisition until an actual operation is issued to that target, so
+this might not be much of a concern in practice.
+
+
+%% \subsection{Memory Ordering Consistency}
+%% \label{sec:memconsist}
+
+%% Since Casper allows multiple processes (including the user application
+%% process and potentially multiple ghost processes) to access the same
+%% memory region, there may be a potential for memory ordering
+%% consistency issues.  Specifically, without appropriate memory ordering
+%% consistency calls, a compiler or processor hardware can freely reorder
+%% instructions that do not have data dependencies to improve
+%% performance.  Of these, compiler reordering is less of an issue since
+%% most compilers are conservative, even at high optimization levels, and
+%% do not reorder instructions across function calls.  Since all MPI RMA
+%% operations are function calls, compiler instruction reordering is not
+%% a direct concern for us.  Hardware architecture reordering, on the
+%% other hand, is a concern.  Almost every architecture available today
+%% permits some level of instruction reordering.  Some architectures,
+%% such as x86, provide total store ordering (TSO) making such reordering
+%% less likely and restricted to fewer instruction patterns, while some
+%% architectures, such as Alpha, permit almost all possible reorderings.
+%% Thus, for portability, we need to assume that any reordering is
+%% possible by the hardware.
+
+%% Luckily, the instruction reordering concerns of Casper are almost
+%% identical to the instruction reordering concerns of MPI RMA, in
+%% general, and would anyway need to be addressed by the MPI
+%% implementation.  For instance, consider the two examples shown in
+%% Figures~\ref{code:mem-consist-uh} and~\ref{code:mem-consist-hh}.  In
+%% the example shown in Figure~\ref{code:mem-consist-uh}, the load
+%% instruction of P1 could be reordered to occur before the lock call
+%% since they are independent of each other, resulting in a wrong result
+%% of the load because the update on process `G' may happen later.
+%% However, this problem is no different from the traditional RMA model
+%% when P0 accesses P1's memory directly (e.g., through shared memory),
+%% and the MPI implementation would need to do a memory barrier anyway.
+%% Note that this behavior would still be true even if the RMA operation
+%% is performed through two-sided communication (over shared memory or
+%% over a network) since any form of communication would eventually need
+%% to perform a memory barrier to ensure that the data is correctly
+%% received.
+
+%% In the second example shown in Figure~\ref{code:mem-consist-hh}, the
+%% update instruction on G0 may also be reordered, hence resulting in a
+%% wrong result of the read operation on G1.  Again, an MPI
+%% implementation would anyway need to do a memory barrier within a flush
+%% call to guarantee that the operation is finished on the target
+%% process, which means it should have already been reflected in memory.
+
+%% \newsavebox\concurrentUHAccessCode
+%% \begin{lrbox}{\concurrentUHAccessCode}
+%% \begin{lstlisting}[linewidth=0.79\columnwidth]
+%% P0:             P1:                 G handler:
+
+%% lock(EXCLUSIVE, P1);
+%% put(x, P1);/* redirected to G */
+%% unlock(P1);                         update x;
+%%                 lock(EXCLUSIVE, P1);
+%%                 load x
+%%                 ...
+%% \end{lstlisting}
+%% \end{lrbox}
+
+
+%% \newsavebox\concurrentHHAccessCode
+%% \begin{lrbox}{\concurrentHHAccessCode}
+%% \begin{lstlisting}[linewidth=0.73\columnwidth]
+%% P0:                G0 handler:  G1 handler:
+
+%% lock(EXCLUSIVE, P2);
+%% put(x, P2);/* redirected to G0 */
+%% flush(P2);         update x;
+%% get(x, P2);/* redirected to G1 */
+%% unlock(P2);                     read x;
+%% \end{lstlisting}
+%% \end{lrbox}
+
+%% \begin{figure}
+%% \begin{CenteredBox}
+%% \subfigure[Concurrent data access between a user and ghost processes]{
+%%   \usebox\concurrentUHAccessCode
+%%   \label{code:mem-consist-uh}
+%% }
+%% \end{CenteredBox}
+%% \begin{CenteredBox}
+%% \subfigure[Concurrent data access between two ghost processes] {
+%%   \usebox\concurrentHHAccessCode
+%%   \label{code:mem-consist-hh}
+%% }
+%% \end{CenteredBox}
+
+%% \caption{Pseudo code of memory consistency issue.}
+%% \label{code:mem-consist}
+%% \end{figure}
+
+
+\subsection{Other Considerations}
+
+To maintain correctness, we also had to address several other aspects
+including self-locks (which are guaranteed by MPI to not be delayed, in
+order to support load\slash store operations) and memory
+load\slash store
+ordering consistency in the presence of multiple application and ghost
+processes.  Because of space limitations, however, we do not describe them
+here.

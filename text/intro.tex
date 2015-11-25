@@ -1,0 +1,151 @@
+%&latex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Introduction}\label{sec:intro}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Massive Parallel Programming on Many-Core Architectures}
+The previous decade, which marked the increase of compute power from
+terascale (ASCI Red supercomputer, deployed at Sandia in 1996~\cite{ascired}) to
+petascale (Roadrunner supercomputer, deployed at Los Alamos in 2008~\cite{roadrunner}),
+passed without a significant paradigm shift: most of the performance
+improvement came from making each processor faster.
+But this improvement was at the cost
+of using more power per processor; and, indeed, the arrival of
+petaflop supercomputers coincided with processors hitting the power
+wall whereby any additional increase in the power usage of a processor would
+result in the processor's components melting or becoming extremely
+unreliable.  Consequently, each processor can no longer become
+significantly faster.
+Another three orders of magnitude increase
+in performance will require at least three orders of magnitude
+increase in the processing components.  This can come from
+more nodes, processor cores, or threads, all of which add significant complexity to the supercomputer.
+We are already beyond the traditional work-distribution paradigm of
+``equal work means equal time.''  That is, on traditional
+supercomputers, if we distribute the work across processors such that
+each processor gets an equal amount of work, then they take an
+equal amount of time to compute.  Such fundamental assumptions are
+already falling apart on today's supercomputers and will continue to
+collapse in future supercomputers, primarily because of the complexity
+of the processor and memory architectures involved.
+
+The issues that arise with such a paradigm shift are not just
+theoretical; indeed, they are already being seen in many application
+domains.  One example is in quantum chemistry simulation.
+Specifically, with the widely used software NWChem~\cite{nwchem}
+(developed by PNNL), the overhead of irregularity in data
+communication across processors and the resulting imbalance in the
+computational load dominate the cost of current simulations (e.g., the
+largest simulations of NWChem spend more than 50\% time idling).  As
+researchers move to much larger simulations, this imbalance is only
+going to get worse.  Another example is in bioinformatics.  The Kiki
+genome assembly application~\cite{kiki}, developed by Argonne, is used
+in metagenomics to understand complex environments containing many
+different microbiomes (e.g., soil).  Because of restrictions in
+current genome sequencing hardware, the problem tends to result in a
+large number of DNA fragments that need to be assembled back into
+their original complete DNA chains.  This involves enormous irregular
+data movement over petabytes of data and requires several days or even
+months of computation.  For instance, the largest simulation done to
+date was at U. Chicago, where a 2.3-terabyte sample was assembled on a
+supercomputer with 18,000 cores---this simulation took 4 days to
+complete and spent 99.9\% of its time idling, because of imbalance
+between processing units.
+
+\section{Motivation}
+\section{Contribution}
+
+Since multicore processors have become the most common processor
+architectures today, the only way to improve the performance for
+high-end processors is to add more threads and cores. Many-core
+architectures, such as Intel Xeon Phi and Blue Gene/Q, provide such a
+massively parallel environment with dozens of cores and hundreds of
+hardware threads. More and more scientific application programmers
+have begun investigating ways to utilize such architecture for scaling
+application performance.
+
+Although many-core architecture can provide the enormous power of
+parallel computing, application performance may still be restricted in
+various ways. Two characteristics of such hardware have to be taken
+into account. First, cores are designed to be simple and low frequency
+for a better performance-to-energy ratio; thus, execution on a single
+core could result in extreme performance degradation. Second, the
+number of cores is increasing at a faster rate than other on-chip
+resources (e.g., memory), potentially resulting in scalability
+bottlenecks.
+
+To better utilize such hardware resources, application programmers
+have studied several approaches that provide better parallelism and
+resource sharing for different scientific applications. Many of those
+approaches, however, still face communication problems that may result
+in performance degradation. This doctoral research aims to exploit the
+capabilities of many-core architectures on the widely used
+message-passing model and propose techniques for solving existing
+communication problems. In this thesis, we focus on optimizing the
+communication of the two most popular programming models used in
+modern applications: a hybrid MPI+threads model and an MPI one-sided
+communication model.
+
+\vspace{0.2ex}
+\noindent\textbf{Communication optimization in hybrid MPI+threads
+  model}.  An increasing number of applications are looking at hybrid
+programming models, frequently called ``MPI+threads,'' to allow
+resources to be shared between different cores on the node. A common
+mode of operation in such hybrid models involves using multiple
+threads to parallelize computation within the node, but using only one
+thread to issue MPI communication. Although such a mode achieves
+significant improvement in floating-point computing by massive
+parallelism, it also means that most of the threads are idle during
+MPI calls, a situation that translates to underutilized hardware
+cores. Furthermore, since MPI communication performs only on a single
+lightweight core, this mode may even result in performance
+degradation.
+
+To resolve the problems in the MPI communication of hybrid model, we
+present MT-MPI~\cite{mtmpi}, an internally multithreaded MPI that
+transparently coordinates with the threading runtime system to share
+idle threads with the application in order to parallelize MPI internal
+processing such as derived datatype communication, shared-memory
+communication, and network I/O operations.
+
+\vspace{0.2ex}
+\noindent\textbf{Optimization for MPI one-sided communication}.  For
+applications with large memory requirements, developers start sharing
+memory resources across nodes through a global shared address space
+implemented by employing MPI one-sided
+communication~\cite{dinan12:armci_mpi}.  The MPI-2 and MPI-3
+standards~\cite{mpi30-report} introduced one-sided communication (also
+known as remote memory access or RMA), which allows one process to
+specify all communication parameters for both sender and receiver.
+Thus a process can access memory regions of other processes in the
+system without the target process explicitly needing to receive or
+process the message. Although such communication semantics can
+asynchronously handle communication progress and hence hide
+communication overheads from computation, it is not truly asynchronous
+in most MPI implementations. For example, although contiguous PUT/GET
+MPI RMA communication can be implemented in hardware on RDMA-supported
+networks such as InfiniBand, thus allowing the hardware to
+asynchronously handle its progress semantics, complex RMA
+communication such as an accumulate operation on a 3D subarray must
+still be done in software within the MPI implementation.
+Consequently, the operation cannot complete at the target process
+without explicitly making MPI progress and thus may cause arbitrarily
+long delays if the target process is busy computing outside the MPI
+stack.
+
+To resolve the problem of asynchronous progress, we propose
+Casper~\cite{casper}, a process-based asynchronous progress model for
+MPI one-sided communication on multicore and many-core architectures,
+that keeps aside a small user-specified number of cores as background
+``ghost processes'' to help asynchronous progress. The philosophy of
+Casper is centered on the notion that since the number of available
+cores in modern many-core systems is increasing rapidly, some of the
+cores might not always be busy with computation and can be dedicated
+to helping with asynchronous progress.
+
+In summary, this Ph.D. thesis aims to enable highly efficient message
+passing on many-core architectures for various kinds of scientific
+applications. Two techniques are proposed to address different
+communication issues existing in modern applications.  In
+Sections~\ref{sec:mtmpi} and \ref{sec:casper}, we separately present
+their current state and sketch the next steps.

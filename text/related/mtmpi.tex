@@ -1,0 +1,50 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{MPI with Multithreading Environment}\label{sec:related}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The hybrid MPI+OpenMP programming model has been extensively used and
+studied in the past.  For instance, Lusk and Chan~\cite{hybrid1} explored the
+performance of such a model on a typical Linux cluster, a large-scale
+system from SiCortex, and an IBM Blue Gene/P system.  The authors
+concluded that some applications performed better with several
+MPI-only processes on the same node, while others could benefit from
+the hybridization.  While this situation is still true today, an
+increasing number of applications are moving to hybrid MPI+OpenMP
+models, not just for performance, but for per-core resource
+limitations (in particular, memory).  Other studies~\cite{hybrid3}
+have, on the other hand, reported satisfactory results in porting the
+finite-difference time-domain algorithm to the hybrid paradigm to
+adapt it to SMP compute nodes.
+
+Smith and Kent~\cite{hybrid2} also found that increasing the number of threads
+decreased the efficiency of the code when implementing the quantum
+Monte Carlo algorithm on mixed OpenMP\slash MPI code on an SGI Origin
+2000 system.  Although this phenomenon was not attributed to the
+idle-threads issue we address in this paper, it certainly contributes
+to the reduced efficiency per thread.  \cite{test_hybrid} performed a
+comprehensive evaluation of multithreaded MPI communications, pointing
+to the mutually exclusive regions involved in communication as one of
+the reasons for the suboptimal performance obtained.
+%% Other work, such
+%% as \cite{hybrid_comparing,more_hybrid}, determined that the
+%% performance of the hybrid approach depends, among other factors, on the
+%% hardware components of the cluster and the characteristics of the
+%% application code.
+
+Several researchers have also looked at optimizing the MPI
+implementation in multithreaded environments.  For example, the
+authors of~\cite{balaji08:mpi_threads, dozsa10:mpi_threads_bg, goodell10:threads_resource_contention}
+proposed various techniques to minimize locking within the MPI
+implementation in order to improve the performance of MPI in
+\texttt{MPI\_THREAD\_MULTIPLE} environments.  They presented various
+techniques to improve performance on traditional Linux clusters as
+well as the IBM Blue Gene/P systems.
+The authors in~\cite{dinan13:endpoints} proposed
+extensions to the MPI standard that would allow the MPI implementation
+to minimize contention and improve performance in some cases.
+However, all these optimizations are for
+\texttt{MPI\_THREAD\_\linebreak[0]MULTIPLE} applications.  A large
+fraction of today's hybrid MPI applications, however, still use
+\texttt{MPI\_THREAD\_\linebreak[0]FUNNELED} and
+\texttt{MPI\_\linebreak[0]THREAD\_SERIALIZED} modes, for which these
+optimizations are not helpful.

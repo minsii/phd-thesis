@@ -1,0 +1,81 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Active-target RMA}\label{sec:active}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+After clarifying the design for passive-target locks, we
+expand it to active-target mode in this section. Since the active-target mode does a
+similar synchronization as the passive mode except that the target
+side also explicitly performs synchronization, there is no semantic
+issue if we internally translate such active synchronization calls
+to passive locks. The active-target synchronization call can be
+\textit{fence} or \textit{PSCW}. We clarify each separately in
+the following paragraphs.
+
+\parahead{MPI\_Win\_fence} This collective synchronization call supports
+a simple synchronization pattern that allows a process to access
+windows at all processes in the group of windows, and the local window
+of a process can be also accessed by all processes in the group
+in between a pair of fence calls. To be specific, a fence call completes
+an epoch if it was preceded by another fence (usually the first
+fence), and starts an epoch if it is followed by another fence
+(usually the second fence). The implementation of such call always
+consists of the permission synchronization among all the processes
+of that window followed by a collective call as a barrier.
+
+Definitely, such processing can be translated as a
+\textit{unlock\_all-barrier-lock\_all} behavior inside Casper,
+whose correctness is already guaranteed as clarified in the passive-target
+mode. Since we do not need any permission synchronization between
+active-target and passive-target epochs like that between \textit{lock}
+and \textit{lock\_all}, we simply use a separate internal window
+containing all the user processes and ghost processes for fence
+calls. Such design also eliminates any potential conflict in active
+and passive-target mixed programs.
+
+It is noted that users can specify \textit{MPI\_MODE\_NOPRECEDE} and
+\textit{MPI\_MODE\_NOSUCCEED} for the first fence and the last one
+respectively, in order to eliminate unnecessary internal
+synchronizations. Obviously, such optimization can be also used in
+Casper lock-based fence. Specifically, a fence with
+\textit{noprecede} does not complete any sequence of locally issued
+RMA calls, and thus the \textit{unlock\_all-barrier} can be
+eliminated. On the other hand, a fence with \textit{nosucceed} does not start any
+locally issued RMA calls, which means that the \textit{lock\_all}
+can be avoided.
+
+\parahead{PSCW} allows synchronization between pairs of communicating
+processes. \textit{MPI\_Win\_start} and \textit{MPI\_Win\_complete}
+are the calls for starting and terminating an epoch to access a group
+on the origin process, while \textit{MPI\_Win\_post} and \textit{MPI\_Win\_wait}
+are used for exposing and closing an epoch on the target process.
+Similarly, such synchronization calls can be also translated to
+passive lock calls: \textit{start} and \textit{complete} are
+internally translated as \textit{lock} and \textit{unlock}
+respectively. The \textit{post} call on the target process is easily
+translated to an empty call, and that target process waits for the
+completion of the origin side in a \textit{wait} call which can be
+implemented as a simple two-sided send\slash receive synchronization
+or a one-sided version in that the target waits for a counter to be updated
+to zero by the origin processes using RMA calls.
+
+
+\textcolor{red}{[NOTE] Active mode is changed to new global-window design.}
+
+\textcolor{red}{[NOTE] Need discuss why we need win\_sync in active mode by default.}
+\textcolor{red}{[NOTE] Need discuss assert optimizations, especially win\_sync.}
+In Fence :
+if (no store) drop (still need win\_sync to avoid load instruction
+reordering.);
+if (no put) drop ? (x=0;fence;remote get(x);fence;x=1; can get return 1 ? or get handler should do mb after read?)
+if (no precede) no flushall;
+if (no succeed) drop (still need barrier to make sure any RMA to my
+window should be done, flushall only ensure locally issued RMA);
+
+In Post-Start:
+if (no check) no send-recv in post-start.
+if (no store) drop (still need win\_sync to avoid load instruction
+reordering.);
+if (no put) drop ? (x=0;post;remote get(x);wait;x=1; can get return 1 ? or get handler should do mb after read?)
+
+\textcolor{red}{
+[NOTE] Current Casper does not pass non\_contiguous to win\_allocate\_shared.
+Non contiguous would have been a good performance enhancement to pass, but is not strictly necessary.  In fact we can argue in the paper that it'll increase the buffer usage in Casper, which is why we didn't use it.}
