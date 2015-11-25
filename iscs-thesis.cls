@@ -22,7 +22,7 @@
 %% in the same archive or directory.)
 \NeedsTeXFormat{LaTeX2e}[1999/01/01]
 \ProvidesClass{iscs-thesis}
-    [2009/03/11 v1.3a
+    [2014/09/02 v1.3b
      Dept of IS/CS thesis class]
 \newcommand\ist@classname{iscs-thesis}
 \newcommand\ist@ahya{%
@@ -475,7 +475,7 @@
   \let \footnote \thanks
   \null\vskip-100\p@\@plus1fill\null
   \centering\isttitlesize
-    {\ist@hookcr\MakeUppercase{\@etitle}}\par
+    {\ist@hookcr\@etitle}\par
     {\@jtitle}\par
     \vskip 20\p@
     by\par
@@ -1306,7 +1306,7 @@
 \def\and{\ist@err@invalid\and}
 \def\abstract{\ist@err@invalid\abstract}
 \if e\ist@engine
-%  \input{ist-en.clo}
+  \input{ist-en.clo}
 \fi
 \setlength\columnsep{10\p@}
 \setlength\columnseprule{0\p@}

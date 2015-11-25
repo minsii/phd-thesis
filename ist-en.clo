@@ -1,0 +1,51 @@
+%%
+%% This is file `ist-en.clo',
+%% generated with the docstrip utility.
+%%
+%% The original source files were:
+%%
+%% iscs-thesis.dtx  (with options: `isten')
+%% 
+%% IMPORTANT NOTICE:
+%% 
+%% For the copyright see the source file.
+%% 
+%% Any modified versions of this file must be renamed
+%% with new filenames distinct from ist-en.clo.
+%% 
+%% For distribution of the original source see the terms
+%% for copying and modification in the file iscs-thesis.dtx.
+%% 
+%% This generated file may be distributed as long as the
+%% original source files, as listed above, are part of the
+%% same distribution. (The sources need not necessarily be
+%% in the same archive or directory.)
+\ProvidesFile{ist-en}
+    [2005/12/25 v1.1f
+     Class option file]
+\def\ist@makesjenv#1{%
+  \@namedef{#1}{\ist@sj@gengobbler{#1}\ist@sj@begin}%
+  \expandafter\let\csname end#1\endcsname=\ist@sj@end}
+\def\ist@makesjcmd#1{\let#1=\ist@sj@cbegin}
+\def\istallowesccode{\catcode`\^^[=9 }
+\def\istdisallowesccode{\catcode`\^^[=15 }
+\begingroup \catcode`\|=0 \catcode`\[=1 \catcode`\]=2 %
+ \catcode`\^^M=12 \catcode`\{=12 \catcode`\}=12 \catcode`\\=12 %
+ |gdef|ist@sj@gengobbler#1[%
+   |def|ist@sj@gobble##1\end{#1}[|end[#1]]]%
+ |gdef|ist@sj@cgobble#1}^^M[|ist@sj@cend]%
+|endgroup
+\def\ist@sj@begin{\ist@sj@sanitize \ist@sj@gobble}
+\def\ist@sj@end{}
+\def\ist@sj@cbegin{\begingroup \ist@sj@sanitize \ist@sj@cgobble}
+\def\ist@sj@cend{\endgroup}
+\def\ist@sj@sanitize{\let\do\@makeother\dospecials
+  \catcode`\^^M=12 \catcode`\ =9 \catcode`\^^[=9 }
+\ist@makesjenv{jabstract}
+\ist@makesjcmd{\jsupervisor}
+\ist@makesjcmd{\jtitle}
+\ist@makesjcmd{\jauthor}
+\istallowesccode
+\endinput
+%%
+%% End of file `ist-en.clo'.
