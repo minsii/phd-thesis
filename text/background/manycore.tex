@@ -1,0 +1,35 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Many-Core Architectures}\label{sec:back-manycore}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The Intel Xeon Phi architecture features a large number of CPU cores
+inside a single chip.  The Xeon Phi cards run their own Linux-based
+operating system and can launch full operating system processes.  In
+the native mode, system calls that cannot be handled directly on the
+Xeon Phi card are transparently forwarded to the host processor, which
+executes them and sends the result back to the issuing process.
+Although these devices also offer the possibility of running in
+\emph{offload mode}, following a GPU-like approach, this mode is not
+considered in our research because it does not allow the coprocessors
+to run hybrid MPI + OpenMP applications.
+
+When MPI processes are launched on a combination of multiple nodes and
+adapters, these processes internally communicate with each other using
+a number of mechanisms.  Processes on the same Xeon Phi card
+communicate with each other using shared memory.  Processes on the
+same node communicate using the PCIe peer-to-peer capabilities.  When
+communicating outside the node, for some networks such as InfiniBand,
+communication is performed directly without host intervention through
+the PCIe root complex.
+
+The first generation of the product released to the public, code-named
+Knights Corner~\cite{knc}, features a minimum of 60 simple cores each
+capable of 4 hardware threads, providing a total of 240 hardware
+threads per coprocessor.  The card is equipped with 8~GB of GDDR5 RAM.
+One difference between this architecture and GPU architectures is the
+fully private and coherent cache provided to each processing unit:
+32~KB instruction + 32~KB data L1, and 512~KB L2 (unified), offering
+high data bandwidth.  Further details on the Intel Xeon Phi
+architecture can be found in~\cite{mic,knc}.
+
+

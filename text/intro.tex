@@ -1,9 +1,8 @@
-%&latex
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Introduction}\label{sec:intro}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Massive Parallel Programming on Many-Core Architectures}
+\section{Heterogeneous Many-Core Architectures}
 The previous decade, which marked the increase of compute power from
 terascale (ASCI Red supercomputer, deployed at Sandia in 1996~\cite{ascired}) to
 petascale (Roadrunner supercomputer, deployed at Los Alamos in 2008~\cite{roadrunner}),
@@ -19,7 +18,8 @@ significantly faster.
 Another three orders of magnitude increase
 in performance will require at least three orders of magnitude
 increase in the processing components.  This can come from
-more nodes, processor cores, or threads, all of which add significant complexity to the supercomputer.
+more nodes, processor cores, or threads, all of which add significant
+complexity to the supercomputer.
 We are already beyond the traditional work-distribution paradigm of
 ``equal work means equal time.''  That is, on traditional
 supercomputers, if we distribute the work across processors such that
@@ -28,6 +28,9 @@ equal amount of time to compute.  Such fundamental assumptions are
 already falling apart on today's supercomputers and will continue to
 collapse in future supercomputers, primarily because of the complexity
 of the processor and memory architectures involved.
+
+
+\section{Complex and Irregular Scientific Applications}
 
 The issues that arise with such a paradigm shift are not just
 theoretical; indeed, they are already being seen in many application
@@ -53,7 +56,6 @@ complete and spent 99.9\% of its time idling, because of imbalance
 between processing units.
 
 \section{Motivation}
-\section{Contribution}
 
 Since multicore processors have become the most common processor
 architectures today, the only way to improve the performance for
@@ -81,7 +83,12 @@ approaches, however, still face communication problems that may result
 in performance degradation. This doctoral research aims to exploit the
 capabilities of many-core architectures on the widely used
 message-passing model and propose techniques for solving existing
-communication problems. In this thesis, we focus on optimizing the
+communication problems.
+
+
+\section{Contribution}
+
+In this thesis, we focus on optimizing the
 communication of the two most popular programming models used in
 modern applications: a hybrid MPI+threads model and an MPI one-sided
 communication model.
@@ -149,3 +156,5 @@ applications. Two techniques are proposed to address different
 communication issues existing in modern applications.  In
 Sections~\ref{sec:mtmpi} and \ref{sec:casper}, we separately present
 their current state and sketch the next steps.
+
+\subsection{Outline}
