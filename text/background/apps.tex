@@ -1,9 +1,66 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Dynamic and Irregular Scientific Applications}\label{sec:back-apps}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+In this section, we introduce several scientific applications that are
+widely used in physics, chemistry and informatics fields. Each of them
+performs dynamic computation and always involves extremely large computing
+data. To fully utilize advanced HPC systems, computational scientists are
+looking at the ways to improve these applications in order to solve larger
+problem sizes with highly accurate results.
 
-\subsection{Quantum Monte Carlo Simulation }
-\cite{qmcpack}
+\subsection{Quantum Monte Carlo Simulation}
+Quantum Monte Carlo (QMC) method is one of the most accurate solution to
+provide accurate and reliable approximation for quantum many-body systems.
+It helps scientists study the complex electronic structure of realistic
+world on large-scale computing systems. The algorithm of QMC method is
+mainly designed around two data objects: enormous ``walkers'' to represent
+the dynamic status of each particle, and a large but read-only ensemble
+data that shared among all walkers. The traditional implementation of
+QMC method utilizes MPI to distribute the walkers among multiple processes
+and simply replicate the ensemble data on each MPI process. However,
+such design extremely limits researchers to study larger physical systems
+or achieve more accurate simulations since the ensemble data is so large
+that always takes Gigabytes memory per core. Especially on modern
+mulit- and many-core systems, whose memory capacity per core is actually
+reducing, a more efficient design is required.
+
+QMCPACk is an open-source QMC package implemented using hybrid MPI+
+threads programming model for massively parallel computing system~\cite{qmcpack}.
+It utilizes threads to parallelize the walkers inside every physical node
+thus the essential memory restriction can be addressed since the large
+enormous data can be shared among threads on every node, and employs MPI
+for inter-node communication as demonstrated in Figure~\ref{fig:app-qmcpack}.
+This design also benefits from reduced collective communication among
+MPI processes that is used for global reduction calculation among walkers,
+and from less number of large point-to-point communication between paired
+MPI processes for exchanging walker objects in the load balance step.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=1\textwidth]{figures/background/app-qmcpack.pdf}
+\caption{Hybrid Implementation of Quantum Monte Carlo Simulation.}
+\label{fig:app-qmcpack}
+\end{figure}
+
+\subsection{Computational Fluid Dynamics}
+Nek5000 is an open-source code that widely used in a broad range of
+applications such as nuclear reactor cores, ocean modeling and combustion
+simulation~\cite{nek5000}. It provides high order, incompressible
+Navier-Stokes solver based on the spectral element method. The implementation
+of Nek5000 is mainly composed of conjugate gradient (CG) solver with
+efficient preconditioners, which is captured in the Nekbone mini-application
+with the basic structure and user interface.
+
+The main computational kernel of Nekbone consists of multi-grid matrix-matrix
+multiplications. Several researches have looked into the optimization for
+such computation pattern on advanced heterogeneous HPC architectures. For
+example, Markidis et al.~\cite{nek-openacc} presented an MPI+OpenACC version
+of Nek5000 code to highly parallelize the most time-consuming ax3D and
+gs\_op subroutines on GPU-accelerated systems. Hart and Ivanov et al.'s papers
+~\cite{nek-eva, nek-openmp4} have also contributed the OpenMP version of
+the Nekbone mini-application for accelerating the local computation on
+Cray supercomputers.
+
 
 \subsection{NWChem Quantum Chemistry Application}
 NWChem is a widely used quantum chemistry application suite that provides
@@ -25,7 +82,7 @@ interactions have to be covered. This means, the diversity of the amount
 of computation per process can be considerably increased, thus resulting
 in extremely irregular computation with data movement.
 
-\begin{figure}[h]
+\begin{figure}[ht]
 \centering
 \subfigure[Interaction in (H$_2$O)$_{21}$ molecule.] {
 \includegraphics[width=0.38\textwidth]{figures/background/app-nwchem-w21.pdf}
@@ -45,9 +102,11 @@ In bioinformatics, since it is still hard to read the whole genomes
 in modern DNA sequencing technology, researchers often break down long
 DNA samples into large amount of small fragments, called ``reads'', and
 then read those reads into digital data as the first step. The next step
-is called assembly, which merges overlapping reads back to one or several contiguous DNA sequences. The sequence assembly technology helps biology
-scientists analyze DNA sequence, and is especially important for understanding complex environments containing many different microbiomes
-(e.g., soil and seawater).
+is called assembly, which merges overlapping reads back to one or several
+contiguous DNA sequences. The sequence assembly technology helps biology
+scientists analyze DNA sequence, and is especially important for understanding
+complex environments containing many different microbiomes (e.g., soil and
+seawater).
 
 The SWAP-Assembler software provides highly scalable assembler that processes
 the sequence assembly on thousands of cores in parallel~\cite{swap}. The
@@ -70,10 +129,7 @@ spent 99.9\% of its time idling, because of imbalance between processing
 units.
 
 
-% Reconstruct long DNA sequences by merging many small fragments as shown
-% in Figure~\ref{fig:app-swap}.
-
-\begin{figure}
+\begin{figure}[ht]
 \centering
 \subfigure[Graph Reduction.] {
 \includegraphics[width=0.3\textwidth]{figures/background/app-swap-graph.pdf}
@@ -87,6 +143,25 @@ units.
 % \vspace{-2.0ex}
 \end{figure}
 
-\subsection{Nuclear Reactor Core Modeling}
-% \subsection{Green’s Function Monte Carlo}
+% \subsection{Nuclear Reactor Core Modeling}
 % \subsection{Graph-Type Parallel Visualization}
+
+\subsection{Green’s Function Monte Carlo}
+
+Green’s Function Monte Carlo (GFMC) is an application in theoretical nuclear
+physics that provides ab initio calculations for few-nucleon systems~\cite{gfmc}.
+It describes the nuclear structures and reactions by solving the
+Schr\"{o}dinger equation and is recognized as the most reliable method
+for nuclei with 12 or fewer nucleons. The implementation of GFMC utilizes
+OpenMP to parallelize heavy sparse matrix-vector multiplications and
+uses MPI to communicate among distributed computing nodes.
+
+The Asynchronous Dynamic Load Balancing (ADLB) library~\cite{adlb} is
+essentially designed for addressing the load balancing among MPI processes
+in GFMC on large scale systems that contain more than one hundred thousand
+computing cores. It provides a general-purpose worker-server model with
+one-sided Put/Get operations that helps application codes dynamical
+share work tasks with assorted work types and priorities. A few server
+processes are initialized to maintain a distributed shared work queue.
+Application processes can then submit arbitrary work tasks to the queue
+with necessary data, and retrieve the results after any task is finished.
