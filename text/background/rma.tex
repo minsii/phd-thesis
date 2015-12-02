@@ -1,182 +1,4 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Hybrid MPI+Threads Programming}\label{sec:back-hybrid}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-Although the number of cores is rapidly increasing on modern multi-
-and many-core architectures, the other system resources (e.g., memory,
-network endpoints) are not growing at the same rate. To efficiently utilize such
-large amount of threads with better resource sharing, application programmers
-are increasingly looking at the hybrid MPI + Thread model, where multiple threads
-are used to parallelize the computation on each computing node and MPI
-is used for the inter-node data communication. The most prominent of the
-threading models used in modern scientific computing is OpenMP~\cite{openmp},
-where applications add annotations in the code with necessary information of
-the parallelism (e.g., the number of threads, the parallel patterns and
-the property of variables), then the compiler can translate these annotations
-into appropriate commands and cooperate with the runtime system for task
-scheduling. In the rest of this section, we focus on the MPI+OpenMP programming.
-
-Since MPI processes and threads are managed by two separate runtime systems,
-additional rules have to be made to ensure the thread safety inside MPI without
-resulting in unnecessary overhead. For example, a message may be concurrently
-matched by the receive calls from two threads on the same process if the
-appropriate thread safety is not provided; conversely, we should also avoid
-over-definition of the thread safety since it can result in significant
-overhead from heavy usage of memory barriers and lock acquiring\slash releasing
-in most MPI implementations even the program does not involve any threads~\cite{thread-safety}.
-
-In this section we introduce the different threading modes defined by MPI for
-multithreaded environments. The MPI standard provides four levels of thread
-safety.
-
-% \begin{figure}[ht]
-%   % \vspace{-1.0ex}
-%   \hspace{0.05\columnwidth}
-%   \subfigure[FUNNELED.] {
-%     \includegraphics[width=0.26\columnwidth]{figures/mtmpi/th_funneled.pdf}
-%     \label{fig:th_mode_funneled}
-%   }
-%   \hspace{1.0ex}
-%   \subfigure[SERIALIZED.] {
-%     \includegraphics[width=0.26\columnwidth]{figures/mtmpi/th_serialized.pdf}
-%     \label{fig:th_mode_serialized}
-%   }
-%   \hspace{1.0ex}
-%   \subfigure[MULTIPLE.] {
-%     \includegraphics[width=0.26\columnwidth]{figures/mtmpi/th_multiple.pdf}
-%     \label{fig:th_mode_mt}
-%   }
-%   \hspace{0.05\columnwidth}
-%   % \vspace{-2.0ex}
-%   \caption{Threading modes in MPI.  A line represents a thread; the
-%     zigzag part represents an active thread in an OpenMP region; the
-%     straight part represents a thread outside an OpenMP region; the
-%     dotted part represents an idle thread in an OpenMP region; the
-%     boxes represent MPI calls.}
-%   \label{fig:th_modes}
-%   % \vspace{-3.0ex}
-% \end{figure}
-
-
-\newsavebox\mpiOutsideBox
-\begin{lrbox}{\mpiOutsideBox}
-\begin{lstlisting}[linewidth=0.45\columnwidth]
-#pragma omp parallel
-{
-
-  /* user computation */
-
-}
-
-MPI_Function();
-\end{lstlisting}
-\end{lrbox}
-
-\newsavebox\mpiInsideMasterBox
-\begin{lrbox}{\mpiInsideMasterBox}
-\begin{lstlisting}[linewidth=0.45\columnwidth]
-#pragma omp parallel
-{
-  /* user computation */
-  #pragma omp master
-  {
-    MPI_Function();
-  }
-}
-\end{lstlisting}
-\end{lrbox}
-
-\newsavebox\mpiInsideCriticalBox
-\begin{lrbox}{\mpiInsideCriticalBox}
-\begin{lstlisting}[linewidth=0.45\columnwidth]
-#pragma omp parallel
-{
-  /* user computation */
-  #pragma omp critical
-  {
-    MPI_Function();
-  }
-}
-\end{lstlisting}
-\end{lrbox}
-
-\newsavebox\mpiInsideSingleBox
-\begin{lrbox}{\mpiInsideSingleBox}
-\begin{lstlisting}[linewidth=0.45\columnwidth]
-#pragma omp parallel
-{
-  /* user computation */
-  #pragma omp single
-  {
-    MPI_Function();
-  }
-}
-\end{lstlisting}
-\end{lrbox}
-
-\begin{figure}%[h]
-\setlength{\subfigcapskip}{5pt}
-\centering
-\subfigure[Outside a parallel region] {
-  \usebox\mpiOutsideBox
-  \label{fig:code_hybrid_outside}
-}
-\hfill
-\subfigure[Inside omp \emp{master} region]{
-  \usebox\mpiInsideMasterBox
-  \label{fig:code_hybrid_master}
-}
-\\
-\vspace{3.0ex}
-\subfigure[Inside omp \emp{critical} region]{
-  \usebox\mpiInsideCriticalBox
-  \label{fig:code_hybrid_critical}
-}
-\hfill
-\subfigure[Inside omp \emp{single} region] {
-  \usebox\mpiInsideSingleBox
-  \label{fig:code_hybrid_single}
-}
-\caption{Different use cases in hybrid MPI+OpenMP.}
-\label{fig:code_omp}
-\end{figure}
-
-\begin{description}
-\item[MPI\_THREAD\_SINGLE] \hfill \\
-In this mode, only a single thread exists in every MPI process. This
-model is commonly referred to as the MPI-only model, where multiple
-MPI processes communicate with each other and no threads are involved.
-
-\item[MPI\_THREAD\_FUNNELED] \hfill \\
-In this mode, multiple threads can be created for parallelizing the
-computation phases on every MPI process, but only the master thread is
-allowed to access MPI stack. In an OpenMP program, this can be implemented
-as either making MPI calls outside the OpenMP parallel region or protecting
-the MPI calls with OpenMP master regions. Figure~\ref{fig:code_hybrid_outside}
-and \ref{fig:code_hybrid_master} demonstrate those implementation
-respectively.
-
-\item[MPI\_THREAD\_SERIALIZED] \hfill \\
-Similar as the funneled mode, multiple threads can be used to parallelize
-the computation in the serialized mode. For the MPI communication phases,
-however, any single thread can issue MPI calls at a time. That is, different
-threads can concurrently perform the computation, but all of them need to
-be synchronized in order to serialize the MPI calls.  In a typical OpenMP
-program, this can be implemented by making MPI calls within OpenMP critical
-regions or single regions as shown in Figure~\ref{fig:code_hybrid_critical}
-and \ref{fig:code_hybrid_single} respectively.
-
-\item[MPI\_THREAD\_MULTIPLE] \hfill \\
-The multiple mode is different from the above levels, multiple threads
-can concurrently perform both user computation and MPI communication.
-The MPI implementation is required to provide appropriate synchronization
-among threads (i.e., lock protection and memory barriers) to protect
-accesses to shared internal data structures.
-
-\end{description}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{MPI One-sided Communication}\label{sec:back-rma}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -207,6 +29,11 @@ demonstrates the difference between the two-sided mode and the one-sided mode.
 \end{figure}
 
 
+
+%===============================
+\subsection{Programming and Semantics}
+%===============================
+
 Because the second contribution of this thesis is a process-based asynchronous
 progress model that comprehensively supports the strict MPI one-sided
 communication semantics which is also the most challenging part in this work,
@@ -215,9 +42,11 @@ of this section. The semantics of the RMA communication can be divided into
 following three primary steps: window creation, RMA synchronization and
 issuing RMA operations.
 
-%------------------------------
-\subsection{Window Creation}
-%------------------------------
+
+%--------------------------
+\subsubsection{Window Creation}
+%--------------------------
+
 A memory area on a process that is exposed to all other processes in a
 specified group---allowing direct access to these processes---is called
 a \emp{ window}. MPI-3 provides the following four window initialization
@@ -258,7 +87,7 @@ the most flexible \fn{MPI\_Win\_create\_dynamic} can rarely get any
 optimization.
 
 %------------------------------
-\subsection{RMA Operations}
+\subsubsection{RMA Operations}
 %------------------------------
 
 After the remote accessible window is identified, a process can issue
@@ -282,8 +111,9 @@ to the target process, and then performs a update on the target side
 following the user specified operation (e.g., \fn{MPI\_SUM}) and stores
 the result into the window. We note that, unlike the put\slash get
 operations, the accumulate operation is guaranteed to be \emp{ordered} and
-\emp{atomic} per basic data element. We will introduce the ordering and
-atomic semantics in Section~\ref{sec:back-rma-semantic}.
+\emp{atomic} per basic data element.
+% We will introduce the ordering and
+% atomic semantics in Section~\ref{sec:back-rma-semantic}.
 \end{description}
 
 Beside above three basic RMA operations, there are three other
@@ -292,7 +122,7 @@ operations also defined in MPI standard: \fn{MPI\_Get\_accumulate},
 semantics of those operation can be found in~\cite{mpi30-report}.
 
 %------------------------------
-\subsection{RMA Synchronization}
+\subsubsection{RMA Synchronization}
 %------------------------------
 
 All the RMA operations are non-blocking MPI calls, which means the completion
@@ -329,8 +159,6 @@ each of them separately in this section.
 \end{figure}
 
 \parahead{Active Mode}:
-% \begin{description}
-% \item[Active Mode]\hfill \\
 This mode provides a similar synchronization as that in two-sided mode,
 both the origin process and the target process need to explicitly
 call the synchronization. Two sets of synchronization calls are defined
@@ -357,7 +185,6 @@ in MPI: \emp{fence} and \emp{post-start-complete-wait}.
 \end{itemize}
 
 \parahead{Passive Mode}:
-% \item[Passive Mode]\hfill \\
 Apart from the semi-dynamic active mode, MPI also offers the passive mode
 which performs completely dynamic pattern. That is, only the process
 issuing operations (origin process) is required to explicitly call the
@@ -394,64 +221,184 @@ synchronization. Two sets of synchronization calls are defined:
 
 % \end{description}
 
+% %------------------------------
+% \subsection{Ordering and Atomicity}\label{sec:back-rma-semantic}
+% %------------------------------
+
+% In the section, we introduce the ordering and atomicity semantics
+% guaranteed for \emp{accumulate}-like operations (i.e., \emp{accumulate},
+% \emp{get\_accumulate}, \emp{fetch\_and\_op}, \emp{compare\_and\_swap})
+% in MPI standard by using two examples for each.
+
+% Any MPI implementation must guarantee the ordering between accumulate-like
+% operations that are issued from the same origin process and sent to the
+% same target. Figure~\ref{fig:code_rma_ordering} gives an example.
+
+% \newsavebox\mpiRmaOrdering
+% \begin{lrbox}{\mpiRmaOrdering}
+% \begin{lstlisting}[linewidth=0.7\columnwidth]
+% P0                              P1
+%                                 x = 2;
+% Lock(P1, win);
+% Get_accumualte(x, y, +1, P1);
+% Accumualte(x, +2, P1);
+% Unlock(P1, win);
+% Read y;
+% \end{lstlisting}
+% \end{lrbox}
+
+% \begin{figure}[ht]
+% \centering
+% \vspace{2.0ex}
+% \usebox\mpiRmaOrdering
+% \caption{Example of Ordering Semantics in MPI RMA communication.}
+% \label{fig:code_rma_ordering}
+% \end{figure}
+
+% MPI also guarantees the atomicity of any accumulate-like operations
+% that are issued to the same target process and the same window memory
+% location per basic data element (e.g., integer or double, but any
+% MPI derived datatype is not included). The operations can be issued
+% from the same origin process or from different ones.
+% Figure~\ref{fig:code_rma_atomic} gives an example.
+
+
+% \newsavebox\mpiRmaAtomic
+% \begin{lrbox}{\mpiRmaAtomic}
+% \begin{lstlisting}[linewidth=1\columnwidth]
+% P0                      P1                      P2
+%                                                 x = 2;
+% Lock(SHARED, P2, win);  Lock(SHARED, P2, win);
+% Accumualte(x, +1, P1);
+%                         Accumualte(x, +2, P1);
+% Unlock(P2, win);        Unlock(P2, win);
+% \end{lstlisting}
+% \end{lrbox}
+
+% \begin{figure}[ht]
+% \centering
+% \vspace{2.0ex}
+% \usebox\mpiRmaAtomic
+% \caption{Example of Atomicity Semantics in MPI RMA communication.}
+% \label{fig:code_rma_atomic}
+% \end{figure}
+
+
+%===============================
+\subsection{Irregular Applications}
+%===============================
+In this section, we introduce three scientific applications in chemistry,
+bioinformatics and nuclear physics fields, all of them involve extremely
+dynamic and irregular computation and data movement, which can benefit
+from the one-side communication model.
+% To fully utilize advanced HPC
+% systems, computational scientists are looking at the ways to improve
+% these applications in order to solve larger problem sizes with highly
+% accurate results.
+
 %------------------------------
-\subsection{Ordering and Atomicity}\label{sec:back-rma-semantic}
+\subsubsection{NWChem Quantum Chemistry Application}
 %------------------------------
+NWChem is a widely used quantum chemistry application suite that provides
+a large set of simulation capabilities~\cite{nwchem}. Due to the large
+memory needs in NWChem that often require memory sharing across multiple
+nodes, it is developed based on the Global Arrays toolkit~\cite{GA_SC94}
+which provides users with distributed dense arrays that can be accessed
+through one-sided operations. Figure~\ref{fig:app-nwchem-pattern}
+demonstrates the typical \emp{get-compute-update} pattern used in NWChem.
 
-In the section, we introduce the ordering and atomicity semantics
-guaranteed for \emp{accumulate}-like operations (i.e., \emp{accumulate},
-\emp{get\_accumulate}, \emp{fetch\_and\_op}, \emp{compare\_and\_swap})
-in MPI standard by using two examples for each.
-
-Any MPI implementation must guarantee the ordering between accumulate-like
-operations that are issued from the same origin process and sent to the
-same target. Figure~\ref{fig:code_rma_ordering} gives an example.
-
-\newsavebox\mpiRmaOrdering
-\begin{lrbox}{\mpiRmaOrdering}
-\begin{lstlisting}[linewidth=0.7\columnwidth]
-P0                              P1
-                                x = 2;
-Lock(P1, win);
-Get_accumualte(x, y, +1, P1);
-Accumualte(x, +2, P1);
-Unlock(P1, win);
-Read y;
-\end{lstlisting}
-\end{lrbox}
+Current NWChem has been looking at small-to-medium molecules (e.g.,
+(H$_2$O)$_{21}$ as shown in Figure~\ref{fig:app-nwchem-w21}) consisting of
+20-100 atoms. Since the coulomb interaction among such small amount of
+atoms is reasonably large, the computation and communication can be
+successful scaled on modern supercomputers. However, scientists aim to
+study more complex molecules that are composed of thousands atoms or even
+larger thus not only the short-range interactions but also the long-range
+interactions have to be covered. This means, the diversity of the amount
+of computation per process can be considerably increased, thus resulting
+in extremely irregular computation with data movement.
 
 \begin{figure}[ht]
 \centering
-\vspace{2.0ex}
-\usebox\mpiRmaOrdering
-\caption{Example of Ordering Semantics in MPI RMA communication.}
-\label{fig:code_rma_ordering}
+\subfigure[Interaction in (H$_2$O)$_{21}$ molecule.] {
+\includegraphics[width=0.38\textwidth]{figures/background/app-nwchem-w21.pdf}
+\label{fig:app-nwchem-w21}}
+\subfigure[Get-Compute-Update pattern.] {
+\includegraphics[width=0.56\textwidth]{figures/background/app-nwchem-get-comp-update.pdf}
+\label{fig:app-nwchem-pattern}}
+\caption{Communication in NWChem Application.}
+\label{fig:app-nwchem}
+% \vspace{-2.0ex}
 \end{figure}
 
-MPI also guarantees the atomicity of any accumulate-like operations
-that are issued to the same target process and the same window memory
-location per basic data element (e.g., integer or double, but any
-MPI derived datatype is not included). The operations can be issued
-from the same origin process or from different ones.
-Figure~\ref{fig:code_rma_atomic} gives an example.
 
+\subsubsection{SWAP-Assembly Bionformatics Application}
 
-\newsavebox\mpiRmaAtomic
-\begin{lrbox}{\mpiRmaAtomic}
-\begin{lstlisting}[linewidth=1\columnwidth]
-P0                      P1                      P2
-                                                x = 2;
-Lock(SHARED, P2, win);  Lock(SHARED, P2, win);
-Accumualte(x, +1, P1);
-                        Accumualte(x, +2, P1);
-Unlock(P2, win);        Unlock(P2, win);
-\end{lstlisting}
-\end{lrbox}
+In bioinformatics, since it is still hard to read the whole genomes
+in modern DNA sequencing technology, researchers often break down long
+DNA samples into large amount of small fragments, called ``reads'', and
+then read those reads into digital data as the first step. The next step
+is called assembly, which merges overlapping reads back to one or several
+contiguous DNA sequences. The sequence assembly technology helps biology
+scientists analyze DNA sequence, and is especially important for understanding
+complex environments containing many different microbiomes (e.g., soil and
+seawater).
+
+The SWAP-Assembler software provides highly scalable assembler that processes
+the sequence assembly on thousands of cores in parallel~\cite{swap}. The
+initial reads are represented as a distributed De Bruijn graph (e.g., )
+Figure~\ref{fig:app-swap-graph}), and final contiguous DNA chains are
+assembled by executing multiple rounds of graph reduction and error removal
+over MPI communication. The communication pattern follows the
+\emp{send-merge-return} mode as shown in Figure~\ref{fig:app-swap-merge}.
+Every process issues each of its local DNA read to a remote process to find
+the overlapping reads. On the remote process, it first searches the
+overlapping read for every received message, then merges the reads and
+finally returns the merged result. If there is no matching read on the
+remote side, the sending process will try another remote process following
+the same patter. This processing always involves enormous irregular data
+movement over petabytes of data and requires several days or even months of
+computation. For instance, the largest simulation done to date was at the
+University of Chicago, where a 2.3-terabyte sample was assembled on a
+supercomputer with 18,000 cores—this simulation took 4 days to complete and
+spent 99.9\% of its time idling, because of imbalance between processing
+units.
+
 
 \begin{figure}[ht]
 \centering
-\vspace{2.0ex}
-\usebox\mpiRmaAtomic
-\caption{Example of Atomicity Semantics in MPI RMA communication.}
-\label{fig:code_rma_atomic}
+\subfigure[Graph Reduction.] {
+\includegraphics[width=0.3\textwidth]{figures/background/app-swap-graph.pdf}
+\label{fig:app-swap-graph}}
+\subfigure[Communication Pattern.] {
+\includegraphics[width=0.65\textwidth]{figures/background/app-swap-merge.pdf}
+\label{fig:app-swap-merge}}
+% \includegraphics[width=0.9\columnwidth]{figures/background/swap-merge.pdf}
+\caption{Irregular Communication in SWAP-Assembly.}
+\label{fig:app-swap}
+% \vspace{-2.0ex}
 \end{figure}
+
+% \subsection{Nuclear Reactor Core Modeling}
+% \subsection{Graph-Type Parallel Visualization}
+
+%------------------------------
+\subsubsection{Green’s Function Monte Carlo}
+%------------------------------
+Green’s Function Monte Carlo (GFMC) is an application in theoretical nuclear
+physics that provides ab initio calculations for few-nucleon systems~\cite{gfmc}.
+It describes the nuclear structures and reactions by solving the
+Schr\"{o}dinger equation and is recognized as the most reliable method
+for nuclei with 12 or fewer nucleons. The implementation of GFMC utilizes
+OpenMP to parallelize heavy sparse matrix-vector multiplications and
+uses MPI to communicate among distributed computing nodes.
+
+The Asynchronous Dynamic Load Balancing (ADLB) library~\cite{adlb} is
+essentially designed for addressing the load balancing among MPI processes
+in GFMC on large scale systems that contain more than one hundred thousand
+computing cores. It provides a general-purpose worker-server model with
+one-sided Put/Get operations that helps application codes dynamical
+share work tasks with assorted work types and priorities. A few server
+processes are initialized to maintain a distributed shared work queue.
+Application processes can then submit arbitrary work tasks to the queue
+with necessary data, and retrieve the results after any task is finished.
