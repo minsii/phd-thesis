@@ -1,16 +1,15 @@
-%&latex
 \documentclass[doctor,final,11pt]{iscs-thesis}
-% \usepackage[whole]{bxcjkjatype}
 \usepackage{graphicx}
 \usepackage{soul, color}
-\definecolor{darkgray}{rgb}{0.95,0.95,0.95}
 \usepackage{listings}
 \lstloadlanguages{C}
 \lstset{language=C}
-\lstset{backgroundcolor=\color{darkgray}}
-\lstset{basicstyle=\scriptsize\tt}
+\lstset{backgroundcolor=\color{white}}
+\lstset{frame=single}
+\lstset{basicstyle=\tt}
 \lstset{framexleftmargin=5pt}
 \lstset{keywordstyle=\bfseries\bf\color{blue}}
+\lstset{otherkeywords={\#pragma,\#define}}
 \usepackage{array}
 \usepackage{fancybox}
 \usepackage{tikz}
@@ -19,7 +18,7 @@
 \usepackage{url}
 \def\UrlBreaks{\do\/\do-}
 \usepackage{enumerate}
-\usepackage[tight,scriptsize]{subfigure}
+\usepackage{subfigure}
 \usepackage{natbib}
 \usepackage{multirow}
 \usepackage[ruled,vlined]{algorithm2e}
@@ -53,9 +52,9 @@
 \special{papersize=8.27in,11.69in} % A4
 
 
-\newcommand{\fn}[1]{\textbf{\small #1}}
+\newcommand{\fn}[1]{{\tt #1}}
 \newcommand{\farg}[1]{\textbf{\small #1}}
-\newcommand{\emp}[1]{\textbf{#1}}
+\newcommand{\emp}[1]{{\tt #1}}
 \newcommand{\parahead}[1]{\medskip\noindent\textbf{#1}}
 \newcommand{\parasubhead}[1]{\smallskip\noindent\textbf{#1}}
 \newcommand{\mynote}[1]{\textcolor{red}{[#1]}}
