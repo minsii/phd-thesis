@@ -1,4 +1,4 @@
-% \section{Introduction}
+\section{Motivation}
 % \label{sec:caspter-intro}
 
 The MPI-2 and MPI-3 standards~\cite{mpi30-report} introduced one-sided
@@ -61,6 +61,8 @@ hardware resources are busy with user computation, which needs to be
 \emph{interrupted} to inject computation related to asynchronous
 progress.  We believe this is not the right point of view for modern
 many-core architectures where the number of cores is very large.
+
+\section{Solution}
 
 In this paper we present ``Casper,'' a process-based asynchronous
 progress solution for MPI on multi- and many-core architectures.

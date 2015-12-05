@@ -346,7 +346,7 @@ seawater).
 
 The SWAP-Assembler software provides highly scalable assembler that processes
 the sequence assembly on thousands of cores in parallel~\cite{swap}. The
-initial reads are represented as a distributed De Bruijn graph (e.g., )
+initial reads are represented as a distributed De Bruijn graph (e.g.,
 Figure~\ref{fig:app-swap-graph}), and final contiguous DNA chains are
 assembled by executing multiple rounds of graph reduction and error removal
 over MPI communication. The communication pattern follows the
@@ -357,9 +357,9 @@ overlapping read for every received message, then merges the reads and
 finally returns the merged result. If there is no matching read on the
 remote side, the sending process will try another remote process following
 the same patter. This processing always involves enormous irregular data
-movement over petabytes of data and requires several days or even months of
+movement over Petabytes of data and requires several days or even months of
 computation. For instance, the largest simulation done to date was at the
-University of Chicago, where a 2.3-terabyte sample was assembled on a
+University of Chicago, where a 2.3-Terabyte sample was assembled on a
 supercomputer with 18,000 cores—this simulation took 4 days to complete and
 spent 99.9\% of its time idling, because of imbalance between processing
 units.

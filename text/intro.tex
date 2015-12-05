@@ -2,159 +2,289 @@
 \chapter{Introduction}\label{sec:intro}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Heterogeneous Many-Core Architectures}
-The previous decade, which marked the increase of compute power from
-terascale (ASCI Red supercomputer, deployed at Sandia in 1996~\cite{ascired}) to
-petascale (Roadrunner supercomputer, deployed at Los Alamos in 2008~\cite{roadrunner}),
-passed without a significant paradigm shift: most of the performance
-improvement came from making each processor faster.
-But this improvement was at the cost
-of using more power per processor; and, indeed, the arrival of
-petaflop supercomputers coincided with processors hitting the power
-wall whereby any additional increase in the power usage of a processor would
-result in the processor's components melting or becoming extremely
-unreliable.  Consequently, each processor can no longer become
-significantly faster.
-Another three orders of magnitude increase
-in performance will require at least three orders of magnitude
-increase in the processing components.  This can come from
-more nodes, processor cores, or threads, all of which add significant
-complexity to the supercomputer.
-We are already beyond the traditional work-distribution paradigm of
-``equal work means equal time.''  That is, on traditional
-supercomputers, if we distribute the work across processors such that
-each processor gets an equal amount of work, then they take an
-equal amount of time to compute.  Such fundamental assumptions are
-already falling apart on today's supercomputers and will continue to
-collapse in future supercomputers, primarily because of the complexity
-of the processor and memory architectures involved.
+Over the past few decades, high performance computing (HPC) has dramatically
+revolutionized the process of scientific advancement. The power of
+supercomputers has been heavily used in various scientific fields including
+climate forecasting, nuclear development, material innovation and so forth.
+HPC has been considered as the lever that accelerates scientific discovery
+and shortens the time for technology to benefit real-world.
+
+Thanks to Moore's Law, the speed of HPC performance was growing at
+exponential rate in the previous decade by improving the density of
+transistors on single core, which marked the increase of computing power
+from Terascale (ASCI Red supercomputer, installed at Sandia National
+Laboratories in 1996~\cite{ascired}) to Petascale (Roadrunner supercomputer,
+deployed at Los Alamos in 2008~\cite{roadrunner}).
+This approach could provide most applications immediate benefits
+without significant change in software since it directly accelerated
+the speed of single threads. However, such performance improvement has also
+brought in similar trend in the power consumption~\cite{freelunch}.
+And indeed, the arrival of petaflop supercomputers coincided with
+processors hitting the power wall whereby any additional increase in
+the power usage of a processor would result in the processor's components
+melting or becoming extremely unreliable. Besides, such approach
+also suffers from physical and economical limitations~\cite{transiswar,hotchips25}.
+Consequently, instead of instruction-level parallelism, processor architects
+started to move to a higher level (i.e. threads) for continuous
+performance advancement.
+
+Accordingly, multi-core architectures have become the norm for high-end
+computing systems now a days~\cite{top500}. Even personal mobile devices
+started to use two or more cores to get better performance (e.g., Quad-core
+Samsung Galaxy Note5, Dual-core iPhone~6).
+The traditional multi-core processors, however, get hard to increase more
+cores on chip due to the high risk of contention in shared resources among
+cores such as bus, cache and memory. In fact, many researches have already
+looked into this problem on multiple-core systems and had to change their
+software design for better performance ~\cite{multicore-eva,multicore-mc}.
+
+Parallel with the advancements of multi-core processors, manufacturers
+started to explore microprocessor design in another direction where hundreds
+and thousands simple cores are embedded into single chip to form a massive
+parallel computational environment, called many-core. A broad vision of
+this kind of architectures can cover any designs that follow the form of
+massive simple core units, including General-Purpose Graphics Processing
+Units (GPGPUs)~\cite{gpu} which contribute to highly data parallelizable
+floating-point computing, the Tilera processors~\cite{tilera} that more
+focus on commercial networking server farms which rely on high throughput,
+and the Intel Many Integrated Core (MIC) architectures as the intermediate
+path between traditional general purpose CPU and the floating-computing
+concentrated GPU architectures. This dissertation focuses on the Intel MIC
+architectures.
 
 
-\section{Complex and Irregular Scientific Applications}
+\begin{table}[ht]%\scriptsize
+\begin{center}
+\caption{Node Configuration in Multi-Core and Many-Core Supercomputers~\cite{top500}.}
+\label{tab:intro-machines}
+\vspace{1.5ex}
+\begin{tabular}{c|c|c|c|c}
+\hline
+\hline
+Year & Name & Cores/Threads & Clock Speed & Memory \\
+\hline
+2009 & Jaguar (Cray XT5) & 6/6 & 2.3GHz & 16GB\\
+2011 & K (Fujitsu SPARC64) & 8/8 & 2GHz & 16GB \\
+2012 & Mira (IBM BG\slash Q) & 16/64 & 1.6GHz & 16GB \\
+% 2013 & Edison (Cray XC30) & 24/24 & 2.4GHz & 64GB \\
+2012 & Stampede (Intel KNC) & 61/244 & 1.1GHz & 8GB \\
+2013 & Tianhe-2 (Intel KNC) & 57/228 & 1.1GHz & 8GB \\
+2016 & Cori (Intel KNL) & 60+/240+ & - & 16GB \\
+\hline
+\hline
+\end{tabular}
+\end{center}
+\end{table}
 
-The issues that arise with such a paradigm shift are not just
-theoretical; indeed, they are already being seen in many application
-domains.  One example is in quantum chemistry simulation.
-Specifically, with the widely used software NWChem~\cite{nwchem}
-(developed by PNNL), the overhead of irregularity in data
-communication across processors and the resulting imbalance in the
-computational load dominate the cost of current simulations (e.g., the
-largest simulations of NWChem spend more than 50\% time idling).  As
-researchers move to much larger simulations, this imbalance is only
-going to get worse.  Another example is in bioinformatics.  The Kiki
-genome assembly application~\cite{kiki}, developed by Argonne, is used
-in metagenomics to understand complex environments containing many
-different microbiomes (e.g., soil).  Because of restrictions in
-current genome sequencing hardware, the problem tends to result in a
-large number of DNA fragments that need to be assembled back into
-their original complete DNA chains.  This involves enormous irregular
-data movement over petabytes of data and requires several days or even
-months of computation.  For instance, the largest simulation done to
-date was at U. Chicago, where a 2.3-terabyte sample was assembled on a
-supercomputer with 18,000 cores---this simulation took 4 days to
-complete and spent 99.9\% of its time idling, because of imbalance
-between processing units.
+The many-cores architectures (i.e., Intel Xeon Phi) have entered the HPC
+market in 2012~\cite{stampede, tianhe2}, providing users a higher degree of
+massive parallelism with dozens of cores and hundreds of hardware threads
+with relatively easy-to-start programming environment since all the applications
+written for traditional CPU systems can be easily executed on this new
+platform without significant modification in code.
+Unlike traditional multi-core processors, the on-chip bus interconnection
+and cache coherency are carefully designed for better sharing among large
+amount of cores, thus minimizing the contention issues existing in
+multi-core systems. However, such architecture does not do magic.
+The many-core parallel environment does not bring us equal improvement in
+performance and scalability as the increase of cores if we just run
+our applications as the ways on traditional processors.
+Application developers have to investigate the appropriate way to fully
+utilize such hardware in HPC programming.
+By comparing the hardware configuration in the top-ranked multi-\slash
+many-core supercomputers from 2009, Table~\ref{tab:intro-machines} clearly
+indicates two special trends in the renovation of high-end processors that
+need to be taken into account.
 
-\section{Motivation}
+\begin{itemize}
+\item Each single core is designed to be simple and low frequency for a
+better performance-to-watt ratio; thus, execution on a single core could
+result in extreme performance degradation comparing to that on traditional
+CPU.
 
-Since multicore processors have become the most common processor
-architectures today, the only way to improve the performance for
-high-end processors is to add more threads and cores. Many-core
-architectures, such as Intel Xeon Phi and Blue Gene/Q, provide such a
-massively parallel environment with dozens of cores and hundreds of
-hardware threads. More and more scientific application programmers
-have begun investigating ways to utilize such architecture for scaling
-application performance.
+\item The number of computing cores is growing at a much faster rate
+than the other on-chip resources (e.g., memory), thus potentially resulting
+in scalability limitation.
+\end{itemize}
 
-Although many-core architecture can provide the enormous power of
-parallel computing, application performance may still be restricted in
-various ways. Two characteristics of such hardware have to be taken
-into account. First, cores are designed to be simple and low frequency
-for a better performance-to-energy ratio; thus, execution on a single
-core could result in extreme performance degradation. Second, the
-number of cores is increasing at a faster rate than other on-chip
-resources (e.g., memory), potentially resulting in scalability
-bottlenecks.
+Not only the restrictions in hardware architectures, the increasing variety
+of applications also aggravates the complexity in parallel programming.
+The message passing programming model defines a mechanism that coordinates
+multiple processes for resolving large computational problems by passing
+messages between each other. The Message Passing Interface (MPI)~\cite{mpi}
+standardizes this model, MPI-1 standard introduced the classical
+two-sided message passing (e.g., \fn{MPI\_Send}\slash \fn{MPI\_Recv}) and
+the collective communication (e.g., \fn{MPI\_Bcast}), MPI-2 and MPI-3 introduced
+the one-sided communication, as known as the Remote Memory Access (RMA)
+model. MPI has been the ``de facto'' industry standard for parallel
+programming on distributed memory clusters and supercomputers for
+more than two decades.
 
-To better utilize such hardware resources, application programmers
-have studied several approaches that provide better parallelism and
-resource sharing for different scientific applications. Many of those
-approaches, however, still face communication problems that may result
-in performance degradation. This doctoral research aims to exploit the
-capabilities of many-core architectures on the widely used
-message-passing model and propose techniques for solving existing
-communication problems.
+The solution of many mathematical problems in scientific applications
+can always be decomposed into regular meshes and parallelized across all
+processes (e.g., Fast Fourier transform, LU decomposition). The classical
+MPI-1 communication functions have perfectly supported the regular data
+movement in those parallel algorithms for years.
+Within advanced computing systems, researchers are eagerly looking into
+larger scale and more complex scientific problems, many of them requiring
+larger and larger memory capacity~\cite{qmcpack}. However, as we have
+compared in Table~\ref{tab:intro-machines}, this does not match the trend
+we have seen in hardwares. To ease the memory crisis among large amount of
+cores on the many-core systems, application developers are increasingly
+looking at the hybrid ``MPI+X'' programming model, comprising a mixture
+of processes and threads, that allows resources on a node to be shared
+between the different threads of an MPI process. Such a model, however,
+also increases the complexity in MPI and results in inefficient communication
+due to limitations in software and hardware especially on the many-core
+systems.
 
+Besides these traditional regular applications, a number of applications
+start to drive more dynamic and irregular data movements, especially
+in chemistry and bioinformatics domains~\cite{gfmc,swap,nwchem}. Most of these applications
+always involve extreme big data with enormous irregular communication
+(e.g, using MPI one-sided operations). However, current HPC systems
+are not yet ready to efficiently handle these computations, severe
+performance degradation has been observed in many of those applications.
+One example is in the quantum chemistry application NWChem~\cite{nwchem},
+the communication overhead can even dominate the entire execution cost
+by more than 50\%. Such communication challenge cannot be resolved by
+only improving the speed of network interconnection, more importantly,
+it is limited by the traditional hardware design of network devices.
+That is, the network devices are connected as PCI-e device, which does
+not have the control of CPUs for handling incoming message on chip,
+resulting in arbitrary delay if CPU cores are being used by user
+applications or other system tasks. Unfortunately, there will be still
+years to completely bring up the asynchronous capability in network
+hardware.
 
-\section{Contribution}
+This dissertation aims to exploit the capabilities of many-core
+architectures on widely used message passing model, in order to address
+these issues existing in different programming models and consequently
+contribute efficient communication approaches for various kinds of
+applications.
 
-In this thesis, we focus on optimizing the
-communication of the two most popular programming models used in
-modern applications: a hybrid MPI+threads model and an MPI one-sided
-communication model.
+\section{Problem Statement}
 
-\vspace{0.2ex}
-\noindent\textbf{Communication optimization in hybrid MPI+threads
-  model}.  An increasing number of applications are looking at hybrid
-programming models, frequently called ``MPI+threads,'' to allow
-resources to be shared between different cores on the node. A common
-mode of operation in such hybrid models involves using multiple
-threads to parallelize computation within the node, but using only one
-thread to issue MPI communication. Although such a mode achieves
-significant improvement in floating-point computing by massive
-parallelism, it also means that most of the threads are idle during
-MPI calls, a situation that translates to underutilized hardware
-cores. Furthermore, since MPI communication performs only on a single
-lightweight core, this mode may even result in performance
-degradation.
+To better utilize the hardware resources on modern multi- and many-core
+architectures, application developers have studied several approaches for
+regular and irregular scientific applications in order to achieve
+better parallelism and resource sharing. Many of those approaches, however,
+still face communication problems that result in performance degradation.
+Here we summarize two critical issues existing in the most popular
+programming models used in modern applications.
 
-To resolve the problems in the MPI communication of hybrid model, we
-present MT-MPI~\cite{mtmpi}, an internally multithreaded MPI that
-transparently coordinates with the threading runtime system to share
-idle threads with the application in order to parallelize MPI internal
-processing such as derived datatype communication, shared-memory
-communication, and network I/O operations.
+\parahead{Inefficient communication and core idleness in hybrid MPI+threads model}.
+The hybrid ``MPI+threads'' programming model has become popular
+in a rang of applications in recent years. Unlike traditional MPI
+programming model, it allows resources to be shared between different
+cores on the node which is especially suitable for parallel programming
+on many-core environment since the memory capacity per single core is
+reducing. A common mode of operation in such hybrid models involves using
+multiple threads to parallelize computation within the node, but using
+only one thread to issue MPI communication. Although such a mode achieves
+significant improvement in floating-point computing by massive parallelism
+without involving heavy thread overhead or complex semantics in MPI, it
+also means that most of the threads are idle during MPI calls, a situation
+that can be translated to underutilized hardware cores. Furthermore, since
+MPI communication performs only on a single low frequency core, this mode
+may even result in performance degradation.
 
-\vspace{0.2ex}
-\noindent\textbf{Optimization for MPI one-sided communication}.  For
-applications with large memory requirements, developers start sharing
-memory resources across nodes through a global shared address space
-implemented by employing MPI one-sided
-communication~\cite{dinan12:armci_mpi}.  The MPI-2 and MPI-3
-standards~\cite{mpi30-report} introduced one-sided communication (also
-known as remote memory access or RMA), which allows one process to
-specify all communication parameters for both sender and receiver.
-Thus a process can access memory regions of other processes in the
-system without the target process explicitly needing to receive or
-process the message. Although such communication semantics can
-asynchronously handle communication progress and hence hide
-communication overheads from computation, it is not truly asynchronous
+\parahead{Lack of asynchronous progress in MPI one-sided communication}.
+An increasing number of applications are looking at the MPI one-sided
+communication model which provides natural dynamic and irregular semantics
+of data movements. It is especially important for many-core programming,
+because many large memory applications rely on a global shared address
+model that supports the ability to share memory resource across nodes
+by employing the MPI one-sided model for internal data movements~\cite{dinan12:armci_mpi}.
+The MPI-2 and MPI-3 standards~\cite{mpi30-report} introduced the one-sided
+communication, which allows one process to specify all communication
+parameters for both sender and receiver. Thus a process can access the
+memory regions on other processes without the remote process explicitly
+needing to receive or process the message. Although such communication
+semantics is able to asynchronously handle communication progress and
+hence hide communication cost from computation, it is not truly asynchronous
 in most MPI implementations. For example, although contiguous PUT/GET
-MPI RMA communication can be implemented in hardware on RDMA-supported
-networks such as InfiniBand, thus allowing the hardware to
-asynchronously handle its progress semantics, complex RMA
-communication such as an accumulate operation on a 3D subarray must
-still be done in software within the MPI implementation.
-Consequently, the operation cannot complete at the target process
-without explicitly making MPI progress and thus may cause arbitrarily
-long delays if the target process is busy computing outside the MPI
-stack.
+operations can be implemented in hardware on RDMA-supported networks(e.g.,
+InfiniBand, Fujitsu Tofu, Cray Aries) thus allowing the hardware to
+asynchronously handle its progress semantics, complex RMA communication
+such as the heavily used non-contiguous accumulate operation (e.g,
+an accumulate on a three-dimension double subarray) must still be done
+in software within the MPI implementation. Consequently, the operation
+cannot complete at the remote process without explicitly making MPI
+progress and thus may cause arbitrarily long delays if the remote process
+is busy computing outside MPI.
 
-To resolve the problem of asynchronous progress, we propose
-Casper~\cite{casper}, a process-based asynchronous progress model for
-MPI one-sided communication on multicore and many-core architectures,
-that keeps aside a small user-specified number of cores as background
+
+% \parahead{Load imbalance and irregularity in two-sided graph applications}.
+
+
+
+\section{Contributions}
+
+This dissertation focuses on the communication optimization in
+various programming models executed on many-core architectures. We
+propose efficient solutions to resolve the two critical challenges we
+have listed in the above section. The contributions of this dissertation
+can be summarized as follows.
+
+\parahead{Multithreaded MPI communication}.
+To resolve the problems in the MPI communication of hybrid ``MPI+Threads''
+model, we present MT-MPI~\cite{mtmpi}, an internally multithreaded MPI that
+transparently coordinates with the threading runtime system to share idle
+threads with the user application in order to parallelize MPI internal
+processing such as derived datatype communication, data transfer in
+shared-memory communication, and network I/O operations.
+
+\parahead{Process-based asynchronous progress model}.
+To resolve the problem of asynchronous progress in irregular applications,
+we propose Casper~\cite{casper}, a process-based asynchronous progress
+model for MPI one-sided communication on multicore and many-core architectures,
+that dedicates a small user-specified number of cores as background
 ``ghost processes'' to help asynchronous progress. The philosophy of
 Casper is centered on the notion that since the number of available
 cores in modern many-core systems is increasing rapidly, some of the
-cores might not always be busy with computation and can be dedicated
+cores might not always be busy with user computation and can be dedicated
 to helping with asynchronous progress.
 
-In summary, this Ph.D. thesis aims to enable highly efficient message
-passing on many-core architectures for various kinds of scientific
-applications. Two techniques are proposed to address different
-communication issues existing in modern applications.  In
-Sections~\ref{sec:mtmpi} and \ref{sec:casper}, we separately present
-their current state and sketch the next steps.
+\parahead{Dynamic adaptable asynchronous progress}.
+Many of complex scientific problems always require integration of multiple
+fundamental solvers and algorithms into application execution, each of
+the phases always performs very different characteristics of communication
+and computation. Thus it is hard to statically determine whether the asynchronous
+progress is needed or not in these applications. To achieve the optimal
+performance for the multi-phases applications, we propose a dynamic adaptation
+mechanism integrated in the Casper library, providing the capability to
+dynamically predict the needs of asynchronous progress for different
+execution phases and transparently adapt asynchronous progress.
+
 
 \section{Outline}
+
+The rest of this dissertation is organized as follows.
+
+In Chapter~\ref{chp:back}, we first give an overview of the many-core
+architecture and introduce the semantics of the popular hybrid programming
+model and the irregular RMA model with several real applications as the
+background of this doctoral research.
+
+In the following three main chapters, we then discuss each contribution
+of this dissertation with detailed description around the motivation,
+the design challenges and the implementation, and the evaluation from
+micro- and macro-kernels to real applications. Specifically,
+Chapter~\ref{chp:mtmpi} discusses the inefficient communication and
+the core idleness issue in the hybrid MPI+threads programming model,
+and presents the multithreaded MPI approah that aims to transparently
+share user idle threads inside MPI communication.
+Chapter~\ref{chp:casper} focuses on the asynchronous progress issue existing
+in irregular MPI one-sided communication model, and presents the process-based
+asynchronous progress model, named ``Casper''. Then Chapter~\ref{chp:adpt}
+looks into the usability of Casper in complex multi-phases applications,
+and we present a dynamic adaptation technique that automatically adjust
+the asynchronous progress for multiple phases of application which involve
+varying communication characteristics.
+
+Chapter~\ref{chp:related} summarizes related works focusing on the
+hybrid programming models, the MPI one-sided communication or the asynchronous
+progress models. Finally, we conclude this dissertation in Chapter~\ref{chp:concl}
+with discussion for the future works we plan to address for the communication
+optimization on many-core architectures.

@@ -1,4 +1,5 @@
 % \section{Introduction}\label{sec:mtmpi-intro}
+\section{Motivation}
 
 Although multicore processor chips are the norm today, architectures
 such as the Intel Xeon Phi take such chips to a new level of
@@ -28,6 +29,8 @@ the OpenMP threads are active only in the computation phase and idle
 during MPI calls, resulting in wasted computational resources.  These
 idle threads translate to underutilized hardware resources on
 massively parallel architectures.
+
+\section{Solution}
 
 In this paper, we present MT-MPI, an internally multithreaded MPI
 implementation that transparently coordinates with the threading

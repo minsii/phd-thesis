@@ -183,7 +183,7 @@ accesses to shared internal data structures.
 \subsection{Typical Applications}
 %===============================
 After a brief overview of the hybrid programming model, we then introduce
-two scientific applications that reply on this model.
+two scientific applications that utilize this model.
 
 %------------------------------
 \subsubsection{Quantum Monte Carlo Simulation}
@@ -193,7 +193,7 @@ provide accurate and reliable approximation for quantum many-body systems.
 It helps scientists study the complex electronic structure of realistic
 world on large-scale computing systems. The algorithm of QMC method is
 mainly designed around two data objects: enormous ``walkers'' to represent
-the dynamic status of each particle, and a large but read-only ensemble
+the dynamic status of each particle, and a large but read-only \emp{ensemble}
 data that shared among all walkers. The traditional implementation of
 QMC method utilizes MPI to distribute the walkers among multiple processes
 and simply replicate the ensemble data on each MPI process. However,
@@ -203,11 +203,11 @@ that always takes Gigabytes memory per core. Especially on modern
 mulit- and many-core systems, whose memory capacity per core is actually
 reducing, a more efficient design is required.
 
-QMCPACk is an open-source QMC package implemented using hybrid MPI+
+QMCPACK is an open-source QMC package implemented using hybrid MPI+
 threads programming model for massively parallel computing system~\cite{qmcpack}.
 It utilizes threads to parallelize the walkers inside every physical node
 thus the essential memory restriction can be addressed since the large
-enormous data can be shared among threads on every node, and employs MPI
+\emp{ensemble} data can be shared among threads on every node, and employs MPI
 for inter-node communication as demonstrated in Figure~\ref{fig:app-qmcpack}.
 This design also benefits from reduced collective communication among
 MPI processes that is used for global reduction calculation among walkers,
@@ -239,7 +239,7 @@ such computation pattern on advanced heterogeneous HPC architectures. For
 example, Markidis et al.~\cite{nek-openacc} presented an MPI+OpenACC version
 of Nek5000 code to highly parallelize the most time-consuming ax3D and
 gs\_op subroutines on GPU-accelerated systems. Hart and Ivanov et al.'s papers
-~\cite{nek-eva, nek-openmp4} have also contributed the OpenMP version of
+~\cite{nek-eva, nek-openmp4} have also contributed the MPI+OpenMP version of
 the Nekbone mini-application for accelerating the local computation on
 Cray supercomputers.
 
